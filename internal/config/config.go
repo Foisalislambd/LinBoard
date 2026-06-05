@@ -7,14 +7,13 @@ import (
 )
 
 const (
-	AppName    = "LinBoard"
-	AppVersion = "1.0.0"
+	AppName     = "LinBoard"
+	AppVersion  = "1.0.0"
+	HotkeyLabel = "Super+V"
 )
 
 type Config struct {
 	MaxHistory     int    `json:"max_history"`
-	HotkeyMod      string `json:"hotkey_mod"`      // ctrl+shift, super, etc.
-	HotkeyKey      string `json:"hotkey_key"`      // v, c, etc.
 	StartMinimized bool   `json:"start_minimized"`
 	PasteOnSelect  bool   `json:"paste_on_select"` // auto-paste when item selected
 	Theme          string `json:"theme"`           // light, dark, system
@@ -23,8 +22,6 @@ type Config struct {
 func Default() *Config {
 	return &Config{
 		MaxHistory:     200,
-		HotkeyMod:      "ctrl+shift",
-		HotkeyKey:      "v",
 		StartMinimized: true,
 		PasteOnSelect:  true,
 		Theme:          "system",
@@ -108,8 +105,4 @@ func (c *Config) Save() error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
-}
-
-func (c *Config) HotkeyLabel() string {
-	return c.HotkeyMod + "+" + c.HotkeyKey
 }

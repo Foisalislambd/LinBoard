@@ -65,7 +65,7 @@ func New() (*App, error) {
 
 	a.history = ui.NewHistoryWindow(a.fyneApp, s, cfg)
 	a.monitor = clipboard.NewMonitor(s)
-	a.hotkey = hotkey.New(cfg)
+	a.hotkey = hotkey.New()
 	a.tray = tray.New(cfg)
 
 	return a, nil

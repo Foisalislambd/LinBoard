@@ -62,4 +62,4 @@ go build -o linboard ./cmd/linboard
 
 echo ""
 echo "Done! Run: ./linboard"
-echo "Hotkey: Ctrl+Shift+V"
+echo "Hotkey: Super+V (Win key + V)"

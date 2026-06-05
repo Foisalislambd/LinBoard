@@ -6,7 +6,7 @@
 
 
 - **Clipboard history** — Automatically saves text, URLs, and images
-- **Global hotkey** — `Ctrl+Shift+V` opens history (like Win+V)
+- **Global hotkey** — `Super+V` (Win+V) opens history — same as Windows
 - **Search** — Filter history instantly
 - **Pin items** — Keep important clips permanently (press `P`)
 - **Keyboard navigation** — ↑↓ navigate, Enter paste, Del remove, Esc close
@@ -68,7 +68,7 @@ go build -o linboard ./cmd/linboard
 
 | Action | Shortcut |
 |--------|----------|
-| Open history | `Ctrl+Shift+V` |
+| Open history | `Super+V` (Win key + V) |
 | Navigate | `↑` / `↓` |
 | Paste selected | `Enter` |
 | Pin / Unpin | `P` |
@@ -84,8 +84,6 @@ Config file: `~/.config/linboard/config.json`
 ```json
 {
   "max_history": 200,
-  "hotkey_mod": "ctrl+shift",
-  "hotkey_key": "v",
   "start_minimized": true,
   "paste_on_select": true,
   "theme": "system"
@@ -95,9 +93,10 @@ Config file: `~/.config/linboard/config.json`
 | Option | Description |
 |--------|-------------|
 | `max_history` | Max unpinned items to keep |
-| `hotkey_mod` | Modifiers: `ctrl`, `shift`, `alt`, `super` (combine with `+`) |
-| `hotkey_key` | Key: `v`, `c`, `b`, `space`, etc. |
 | `paste_on_select` | Auto-paste when selecting an item |
+| `theme` | `light`, `dark`, or `system` |
+
+History hotkey is fixed at **Super+V** (Win key + V), like Windows.
 
 ## Data location
 

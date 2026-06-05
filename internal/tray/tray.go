@@ -39,10 +39,10 @@ func (t *Tray) Run(onReady func()) {
 
 func (t *Tray) setup() {
 	systray.SetTitle("LinBoard")
-	systray.SetTooltip("LinBoard — Clipboard Manager (" + t.cfg.HotkeyLabel() + ")")
+	systray.SetTooltip("LinBoard — Clipboard Manager (" + config.HotkeyLabel + ")")
 
 	mShow := systray.AddMenuItem(
-		"Show History ("+t.cfg.HotkeyLabel()+")",
+		"Show History ("+config.HotkeyLabel+")",
 		"Open clipboard history",
 	)
 	systray.AddSeparator()
