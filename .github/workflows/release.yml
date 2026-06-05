@@ -133,7 +133,8 @@ jobs:
           mkdir -p "$PKG/lib"
           cp scripts/lib/system-setup.sh "$PKG/lib/system-setup.sh"
           cp install/linboard.desktop "$PKG/linboard.desktop"
-          cp -r internal/assets/icons/hicolor "$PKG/icons/hicolor"
+          mkdir -p "$PKG/icons"
+          cp -r internal/assets/icons/hicolor "$PKG/icons/"
           cp scripts/package/QUICKSTART.txt "$PKG/QUICKSTART.txt"
           chmod +x "$PKG/install.sh" "$PKG/linboard"
           tar -czf "dist/${ASSET}-v${VERSION}.tar.gz" -C "$PKG" .
