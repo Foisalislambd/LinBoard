@@ -16,6 +16,7 @@ import (
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/hotkey"
 	"github.com/foisal/linboard/internal/ipc"
+	"github.com/foisal/linboard/internal/platform"
 	"github.com/foisal/linboard/internal/store"
 	"github.com/foisal/linboard/internal/tray"
 	"github.com/foisal/linboard/internal/ui"
@@ -79,7 +80,16 @@ func (a *App) showHistory() {
 	}, false)
 }
 
+func (a *App) showHistoryWindow() {
+	a.fyneApp.Driver().DoFromGoroutine(func() {
+		a.history.Show()
+	}, false)
+}
+
 func (a *App) Run() {
+	log.Printf("LinBoard %s — %s / %s (paste: %s)",
+		config.AppVersion, platform.SessionDescription(), platform.DesktopName(), clipboard.PasteToolName())
+
 	a.monitor.OnChange(a.updateTrayCount)
 	a.monitor.Start(a.ctx)
 
@@ -92,11 +102,7 @@ func (a *App) Run() {
 		a.ipc = ipcSrv
 	}
 
-	a.tray.OnShow(func() {
-		a.fyneApp.Driver().DoFromGoroutine(func() {
-			a.history.Show()
-		}, false)
-	}) // tray menu always works as fallback
+	a.tray.OnShow(a.showHistoryWindow)
 	a.tray.OnClear(func() {
 		if err := a.store.ClearUnpinned(); err != nil {
 			log.Printf("clear history: %v", err)
@@ -109,8 +115,8 @@ func (a *App) Run() {
 
 	go func() {
 		if err := a.hotkey.Start(); err != nil {
-			log.Printf("hotkey registration failed: %v", err)
-			log.Printf("tray icon → Show History still works")
+			log.Printf("hotkey: %v", err)
+			log.Printf("tray → Show History, or run: linboard install-shortcut")
 		}
 	}()
 
@@ -143,6 +149,8 @@ func (a *App) Shutdown() {
 			a.ipc.Close()
 		}
 		_ = a.store.Close()
-		a.fyneApp.Quit()
+		a.fyneApp.Driver().DoFromGoroutine(func() {
+			a.fyneApp.Quit()
+		}, false)
 	})
 }

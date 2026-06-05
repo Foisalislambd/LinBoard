@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"log"
 	"os"
-	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -149,15 +148,6 @@ func PasteClip(clip *store.Clip) error {
 	// Brief pause so focus returns to the previous window after our popup closes.
 	time.Sleep(120 * time.Millisecond)
 	return simulatePaste()
-}
-
-func simulatePaste() error {
-	// xdotool works on X11; on Wayland clipboard is still updated even if paste fails.
-	cmd := exec.Command("xdotool", "key", "ctrl+v")
-	if err := cmd.Run(); err != nil {
-		log.Printf("auto-paste (xdotool) failed: %v — content is on clipboard", err)
-	}
-	return nil
 }
 
 func imageFingerprint(data []byte) string {

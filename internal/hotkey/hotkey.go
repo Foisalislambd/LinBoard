@@ -13,7 +13,7 @@ type backend interface {
 	stop()
 }
 
-// Manager registers Super+V using the best backend for the session.
+// Manager registers Super+V using the best backend for the session and desktop.
 type Manager struct {
 	backend backend
 	onPress func()
@@ -32,37 +32,65 @@ func (m *Manager) Start() error {
 		return fmt.Errorf("hotkey: no handler")
 	}
 
-	log.Printf("hotkey: session %s, target %s", platform.SessionDescription(), config.HotkeyLabel)
+	log.Printf("hotkey: %s on %s, target %s",
+		platform.SessionDescription(), platform.DesktopName(), config.HotkeyLabel)
 
-	if platform.UsePortalHotkey() {
-		if portalHasGlobalShortcuts() {
-			m.backend = &portalBackend{}
-			if err := m.backend.start(m.onPress); err == nil {
-				return nil
-			} else {
-				log.Printf("hotkey: portal failed: %v", err)
-			}
+	// 1) xdg-desktop-portal (KDE Plasma 6+, future GNOME)
+	if platform.UsePortalHotkey() && portalHasGlobalShortcuts() {
+		m.backend = &portalBackend{}
+		if err := m.backend.start(m.onPress); err != nil {
+			log.Printf("hotkey: portal failed: %v", err)
 		} else {
-			log.Printf("hotkey: portal GlobalShortcuts not available on this system")
+			return nil
 		}
-
-		if platform.IsGNOME() {
-			m.backend = &gnomeBackend{}
-			if err := m.backend.start(m.onPress); err != nil {
-				log.Printf("hotkey: GNOME gsettings failed: %v", err)
-			} else {
-				return nil
-			}
-		}
-
-		return fmt.Errorf("no working hotkey backend on Wayland — use tray menu or: linboard toggle")
+	} else if platform.UsePortalHotkey() {
+		log.Printf("hotkey: portal GlobalShortcuts not available")
 	}
 
-	m.backend = &x11Backend{}
-	if err := m.backend.start(m.onPress); err != nil {
-		return err
+	// 2) Desktop environment system shortcut → linboard toggle (CopyQ-style)
+	if b := desktopBackend(); b != nil {
+		m.backend = b
+		if err := m.backend.start(m.onPress); err != nil {
+			log.Printf("hotkey: %s shortcut failed: %v", platform.DesktopName(), err)
+		} else {
+			return nil
+		}
 	}
-	return nil
+
+	// 3) Try any supported DE registration (e.g. Ubuntu on GNOME)
+	if err := RegisterSystemShortcut(); err == nil {
+		log.Printf("hotkey registered (system): %s → linboard toggle", config.HotkeyLabel)
+		m.backend = &noopBackend{}
+		return nil
+	} else {
+		log.Printf("hotkey: system registration: %v", err)
+	}
+
+	// 4) X11 low-level grab
+	if !platform.UsePortalHotkey() {
+		m.backend = &x11Backend{}
+		if err := m.backend.start(m.onPress); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return fmt.Errorf("could not bind %s — run: linboard install-shortcut", config.HotkeyLabel)
+}
+
+func desktopBackend() backend {
+	switch platform.CurrentDesktop() {
+	case platform.DesktopGNOME:
+		return &gnomeBackend{}
+	case platform.DesktopKDE:
+		return &kdeBackend{}
+	case platform.DesktopXFCE:
+		return &xfceBackend{}
+	case platform.DesktopCinnamon:
+		return &cinnamonBackend{}
+	default:
+		return nil
+	}
 }
 
 func (m *Manager) Stop() {
@@ -70,3 +98,8 @@ func (m *Manager) Stop() {
 		m.backend.stop()
 	}
 }
+
+type noopBackend struct{}
+
+func (noopBackend) start(func()) error { return nil }
+func (noopBackend) stop()              {}

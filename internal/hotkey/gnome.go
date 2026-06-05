@@ -3,12 +3,11 @@ package hotkey
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/foisal/linboard/internal/config"
+	"github.com/foisal/linboard/internal/platform"
 )
 
 const (
@@ -21,7 +20,11 @@ const (
 type gnomeBackend struct{}
 
 func (b *gnomeBackend) start(_ func()) error {
-	if err := setupGNOMEHotkey(); err != nil {
+	exe, err := executablePath()
+	if err != nil {
+		return err
+	}
+	if err := setupGNOMEHotkey(exe); err != nil {
 		return err
 	}
 	log.Printf("hotkey registered (GNOME): %s → linboard toggle", config.HotkeyLabel)
@@ -30,14 +33,9 @@ func (b *gnomeBackend) start(_ func()) error {
 
 func (b *gnomeBackend) stop() {}
 
-func setupGNOMEHotkey() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	exe, err = filepath.Abs(exe)
-	if err != nil {
-		return err
+func setupGNOMEHotkey(exe string) error {
+	if !platform.IsGNOME() {
+		return skip("not GNOME")
 	}
 
 	bindingPath := "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/" + gnomeBindingName + "/"

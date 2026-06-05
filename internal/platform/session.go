@@ -20,7 +20,7 @@ func UsePortalHotkey() bool {
 
 func SessionDescription() string {
 	if UsePortalHotkey() {
-		return "wayland (portal)"
+		return "wayland"
 	}
 	return "x11"
 }

@@ -32,7 +32,8 @@ Commands:
   test        Run go test ./...
   vet         Run go vet ./...
   setup       Install system deps + build (needs sudo)
-  install     Copy binary to ~/.local/bin/linboard
+  install     Full install (~/.local/bin + autostart + Super+V)
+  install-shortcut  Register Super+V only
   stop        Stop running LinBoard process
   help        Show this help
 
@@ -102,10 +103,12 @@ cmd_setup() {
 
 cmd_install() {
   cmd_build
-  mkdir -p "$HOME/.local/bin"
-  install -m 755 "$ROOT/$BINARY" "$HOME/.local/bin/$BINARY"
-  echo "==> Installed: $HOME/.local/bin/$BINARY"
-  echo "    Make sure ~/.local/bin is in your PATH"
+  "$ROOT/$BINARY" install
+}
+
+cmd_install_shortcut() {
+  cmd_build
+  "$ROOT/$BINARY" install-shortcut
 }
 
 cmd_stop() {
@@ -129,6 +132,7 @@ case "${1:-help}" in
   vet)         shift; cmd_vet "$@" ;;
   setup)       shift; cmd_setup "$@" ;;
   install)     shift; cmd_install "$@" ;;
+  install-shortcut) shift; cmd_install_shortcut "$@" ;;
   stop)        shift; cmd_stop "$@" ;;
   help|-h|--help) usage ;;
   *)

@@ -1,6 +1,6 @@
 # LinBoard — make targets (wrapper around scripts/dev.sh)
 
-.PHONY: help build run rebuild clean clean-cache clean-all deps test vet setup install stop
+.PHONY: help build run rebuild clean clean-cache clean-all deps test vet setup install install-shortcut stop
 
 help:
 	@./scripts/dev.sh help
@@ -37,6 +37,9 @@ setup:
 
 install:
 	@./scripts/dev.sh install
+
+install-shortcut:
+	@./linboard install-shortcut
 
 stop:
 	@./scripts/dev.sh stop

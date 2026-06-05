@@ -1,105 +1,108 @@
 # LinBoard
 
-**LinBoard** is a human-friendly clipboard manager for Linux, inspired by Windows clipboard history (Win+V). Built with Go.
+[![CI](https://github.com/foisal/linboard/actions/workflows/ci.yml/badge.svg)](https://github.com/foisal/linboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**LinBoard** is an open-source clipboard manager for Linux — Windows **Win+V** style history, built with Go.
+
+Works on **GNOME, KDE Plasma, XFCE, Cinnamon**, **X11 and Wayland**.
 
 ## Features
 
+- Clipboard history — text, URLs, images
+- **Super+V** (Win+V) global hotkey
+- Search, pin, keyboard navigation
+- System tray background app
+- Persistent SQLite storage
+- Auto-paste on select (Wayland: `wtype` / `ydotool`, X11: `xdotool`)
 
-- **Clipboard history** — Automatically saves text, URLs, and images
-- **Global hotkey** — `Super+V` (Win+V) opens history — same as Windows
-- **Search** — Filter history instantly
-- **Pin items** — Keep important clips permanently (press `P`)
-- **Keyboard navigation** — ↑↓ navigate, Enter paste, Del remove, Esc close
-- **System tray** — Runs quietly in the background
-- **Persistent storage** — History survives reboots (SQLite)
-- **Auto-paste** — Selected item is pasted into the active window
-
-## Stack (latest as of June 2026)
-
-| Component | Version |
-|-----------|---------|
-| Go | **1.26.4** |
-| Fyne | **v2.7.4** |
-| golang.design/x/clipboard | **v0.7.1** |
-| golang.design/x/hotkey | **v0.4.1** |
-| modernc.org/sqlite | **v1.51.0** |
-| getlantern/systray | **v1.2.2** |
-
-## Quick setup
+## Quick install
 
 ```bash
-./scripts/setup.sh
-# or
-make setup
-```
-
-This installs system dependencies, verifies Go 1.26.4, and builds the binary.
-
-## Build & dev commands
-
-```bash
-make build        # build ./linboard
-make run          # build + run
-make rebuild      # clean + build
-make clean        # remove binary
-make clean-all    # remove binary + Go cache
-make deps         # go mod tidy + download
-make test         # run tests
-make vet          # static analysis
-make install      # install to ~/.local/bin
-make stop         # stop running LinBoard
-make help         # all commands
-```
-
-Same via script: `./scripts/dev.sh <command>`
-
-## Requirements
-
-- Linux with **X11** (recommended) or Wayland
-- `xdotool` for auto-paste (optional but recommended):
-  ```bash
-  sudo apt install xdotool   # Debian/Ubuntu
-  sudo dnf install xdotool   # Fedora
-  ```
-- System tray support (for GNOME: install AppIndicator extension)
-
-### Build dependencies
-
-```bash
-# Debian/Ubuntu
-sudo apt install gcc libc6-dev libx11-dev libxcursor-dev libxrandr-dev \
-  libxinerama-dev libxi-dev libgl1-mesa-dev libxxf86vm-dev
-
-# Fedora
-sudo dnf install gcc libX11-devel libXcursor-devel libXrandr-devel \
-  libXinerama-devel libXi-devel mesa-libGL-devel libXxf86vm-devel
-```
-
-## Install & Run
-
-```bash
-git clone <repo-url> linboard
+git clone https://github.com/foisal/linboard.git
 cd linboard
-go build -o linboard ./cmd/linboard
+./scripts/setup.sh    # deps + build (Debian/Ubuntu)
+./linboard install    # ~/.local/bin + autostart + Super+V
+linboard              # start
+```
+
+Or manually:
+
+```bash
+make build
 ./linboard
 ```
 
-## Usage
+## Commands
 
-| Action | Shortcut |
-|--------|----------|
-| Open history | `Super+V` (Win key + V) |
-| Navigate | `↑` / `↓` |
-| Paste selected | `Enter` |
-| Pin / Unpin | `P` |
-| Delete item | `Delete` |
-| Close | `Esc` |
+| Command | Description |
+|---------|-------------|
+| `linboard` | Start (system tray) |
+| `linboard toggle` | Show/hide history |
+| `linboard install` | Install binary + autostart + shortcut |
+| `linboard install-shortcut` | Register Super+V only |
+| `make run` | Build and run |
 
-Right-click the tray icon for menu options.
+## Hotkey (Super+V)
+
+LinBoard picks the best method automatically:
+
+| Environment | Method |
+|-------------|--------|
+| KDE Plasma 6+ (Wayland) | xdg-desktop-portal |
+| GNOME / Ubuntu | GNOME Custom Shortcut (`gsettings`) |
+| KDE Plasma | KHotKeys (`khotkeysrc`) |
+| XFCE | `xfconf-query` |
+| Cinnamon | Cinnamon keybindings |
+| X11 session | X11 key grab |
+
+All desktop shortcuts run `linboard toggle`, which talks to the running app via IPC.
+
+**Verify:** Settings → Keyboard → look for **LinBoard**
+
+## Requirements
+
+### Runtime (auto-paste)
+
+| Session | Package |
+|---------|---------|
+| Wayland | `wtype` (recommended) or `ydotool` |
+| X11 | `xdotool` |
+
+```bash
+# Debian/Ubuntu
+sudo apt install wtype xdotool
+
+# Fedora
+sudo dnf install wtype xdotool
+
+# Arch
+sudo pacman -S wtype xdotool
+```
+
+### Build
+
+```bash
+# Debian/Ubuntu
+sudo apt install gcc pkg-config libx11-dev libxcursor-dev libxrandr-dev \
+  libxinerama-dev libxi-dev libgl1-mesa-dev libxxf86vm-dev \
+  libayatana-appindicator3-dev libdbus-1-dev
+
+# Fedora
+sudo dnf install gcc pkg-config libX11-devel libXcursor-devel libXrandr-devel \
+  libXinerama-devel libXi-devel mesa-libGL-devel libXxf86vm-devel \
+  libayatana-appindicator3-devel dbus-devel
+
+# Arch
+sudo pacman -S gcc pkgconf libx11 libxcursor libxrandr libxinerama libxi \
+  mesa libxxf86vm libayatana-appindicator3 dbus
+```
+
+GNOME users: install **AppIndicator** extension for tray icon.
 
 ## Configuration
 
-Config file: `~/.config/linboard/config.json`
+`~/.config/linboard/config.json`
 
 ```json
 {
@@ -110,45 +113,34 @@ Config file: `~/.config/linboard/config.json`
 }
 ```
 
-| Option | Description |
-|--------|-------------|
-| `max_history` | Max unpinned items to keep |
-| `paste_on_select` | Auto-paste when selecting an item |
-| `theme` | `light`, `dark`, or `system` |
+## Data
 
-History hotkey is fixed at **Super+V** (Win key + V), like Windows.
+| Path | Content |
+|------|---------|
+| `~/.config/linboard/config.json` | Settings |
+| `~/.config/linboard/data/history.db` | History |
+| `~/.config/linboard/data/images/` | Image clips |
 
-### Wayland / GNOME (Ubuntu)
+## Development
 
-Ubuntu 24.04 GNOME has **no** `GlobalShortcuts` portal. LinBoard auto-registers **Super+V** via GNOME Settings (`gsettings`) on first start — same idea as CopyQ's system shortcut fallback.
-
-1. `make run` — Super+V is configured automatically
-2. Verify: **Settings → Keyboard → Custom Shortcuts** → `LinBoard`
-3. Test: `./linboard toggle` (while LinBoard is running)
-
-If Super+V conflicts with another app, change the binding in GNOME Settings.
-
-## Data location
-
-- Config: `~/.config/linboard/config.json`
-- Database: `~/.config/linboard/data/history.db`
-- Images: `~/.config/linboard/data/images/`
-
-## Autostart
-
-Add to `~/.config/autostart/linboard.desktop`:
-
-```ini
-[Desktop Entry]
-Type=Application
-Name=LinBoard
-Comment=Clipboard Manager
-Exec=/path/to/linboard
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
+```bash
+make help
+make build
+make vet
+make test
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| Super+V does nothing | Run `linboard install-shortcut`, ensure LinBoard is running |
+| Tray icon missing (GNOME) | Install AppIndicator extension |
+| Auto-paste fails (Wayland) | `sudo apt install wtype` |
+| Hotkey conflict | Change binding in system keyboard settings |
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

@@ -5,8 +5,58 @@ import (
 	"strings"
 )
 
-// IsGNOME reports whether the current desktop is GNOME-based.
-func IsGNOME() bool {
+type Desktop int
+
+const (
+	DesktopUnknown Desktop = iota
+	DesktopGNOME
+	DesktopKDE
+	DesktopXFCE
+	DesktopCinnamon
+	DesktopMATE
+	DesktopOther
+)
+
+func CurrentDesktop() Desktop {
 	desktop := strings.ToLower(os.Getenv("XDG_CURRENT_DESKTOP"))
-	return strings.Contains(desktop, "gnome") || strings.Contains(desktop, "ubuntu")
+	session := strings.ToLower(os.Getenv("DESKTOP_SESSION"))
+
+	switch {
+	case strings.Contains(desktop, "kde") || strings.Contains(session, "plasma"):
+		return DesktopKDE
+	case strings.Contains(desktop, "xfce"):
+		return DesktopXFCE
+	case strings.Contains(desktop, "cinnamon"):
+		return DesktopCinnamon
+	case strings.Contains(desktop, "mate"):
+		return DesktopMATE
+	case strings.Contains(desktop, "gnome") || strings.Contains(desktop, "ubuntu") || strings.Contains(session, "ubuntu"):
+		return DesktopGNOME
+	default:
+		return DesktopOther
+	}
 }
+
+func DesktopName() string {
+	switch CurrentDesktop() {
+	case DesktopGNOME:
+		return "GNOME"
+	case DesktopKDE:
+		return "KDE Plasma"
+	case DesktopXFCE:
+		return "XFCE"
+	case DesktopCinnamon:
+		return "Cinnamon"
+	case DesktopMATE:
+		return "MATE"
+	case DesktopOther:
+		return "Linux"
+	default:
+		return "unknown"
+	}
+}
+
+func IsGNOME() bool  { return CurrentDesktop() == DesktopGNOME }
+func IsKDE() bool    { return CurrentDesktop() == DesktopKDE }
+func IsXFCE() bool   { return CurrentDesktop() == DesktopXFCE }
+func IsCinnamon() bool { return CurrentDesktop() == DesktopCinnamon }
