@@ -11,10 +11,11 @@ linboard_detect_os() {
   LINBOARD_PM=""   # apt, dnf, pacman, zypper
 
   if [[ -f /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    LINBOARD_OS_ID="${ID:-unknown}"
-    LINBOARD_OS_LIKE="${ID_LIKE:-}"
+    # Parse without sourcing — /etc/os-release sets VERSION, ID, etc. and would
+    # clobber the installer's release version variable.
+    LINBOARD_OS_ID="$(grep -E '^ID=' /etc/os-release | head -1 | cut -d= -f2- | tr -d '"')"
+    LINBOARD_OS_LIKE="$(grep -E '^ID_LIKE=' /etc/os-release | head -1 | cut -d= -f2- | tr -d '"')"
+    LINBOARD_OS_ID="${LINBOARD_OS_ID:-unknown}"
   fi
 
   case "$LINBOARD_OS_ID" in

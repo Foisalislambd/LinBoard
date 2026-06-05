@@ -5,7 +5,6 @@ set -euo pipefail
 
 REPO="${LINBOARD_REPO:-Foisalislambd/LinBoard}"
 BRANCH="${LINBOARD_BRANCH:-main}"
-VERSION="${LINBOARD_VERSION:-latest}"
 BIN_DIR="${LINBOARD_BIN_DIR:-$HOME/.local/bin}"
 RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 
@@ -19,6 +18,9 @@ source "$TMP/system-setup.sh"
 
 linboard_preflight_setup
 
+# Use LINBOARD_RELEASE (not VERSION — /etc/os-release defines VERSION on Ubuntu)
+LINBOARD_RELEASE="${LINBOARD_VERSION:-latest}"
+
 arch="$(uname -m)"
 case "$arch" in
   x86_64|amd64)  ASSET="linboard-linux-amd64" ;;
@@ -29,11 +31,11 @@ case "$arch" in
     ;;
 esac
 
-if [ "$VERSION" = "latest" ]; then
+if [ "$LINBOARD_RELEASE" = "latest" ]; then
   API="https://api.github.com/repos/${REPO}/releases/latest"
   VERSION_TAG="$(curl -fsSL "$API" | grep -oP '"tag_name"\s*:\s*"\K[^"]+' | head -1)"
 else
-  VERSION_TAG="$VERSION"
+  VERSION_TAG="$LINBOARD_RELEASE"
   case "$VERSION_TAG" in
     v*) ;;
     *) VERSION_TAG="v${VERSION_TAG}" ;;
