@@ -1,422 +1,155 @@
 # LinBoard
 
-[![CI](https://github.com/Foisalislambd/LinBoard/actions/workflows/ci.yml/badge.svg)](https://github.com/Foisalislambd/LinBoard/actions/workflows/ci.yml)
-[![Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml/badge.svg)](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
+**Windows-style clipboard history for Linux** — press **Super+V** and pick from everything you've copied.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Foisalislambd/LinBoard?label=download)](https://github.com/Foisalislambd/LinBoard/releases)
 
-**LinBoard** is an open-source clipboard manager for Linux — Windows **Win+V** style history, built with Go.
+Works on **GNOME · KDE Plasma · XFCE · Cinnamon** — **X11 and Wayland**.
 
-**Repository:** [github.com/Foisalislambd/LinBoard](https://github.com/Foisalislambd/LinBoard)
+---
 
-Works on **GNOME, KDE Plasma, XFCE, Cinnamon**, **X11 and Wayland**.
+## Install
 
-**New here?** Jump to the [Installation guide](#installation-guide).
+Copy and paste this in your terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
+```
+
+That's it. The script downloads the latest version, installs LinBoard, sets up autostart, and registers **Super+V**.
+
+> **Need auto-paste?** Install `wtype` (Wayland) or `xdotool` (X11) first:
+> `sudo apt install wtype xdotool`
+
+---
+
+## Start using LinBoard
+
+```bash
+linboard          # start (runs in the system tray)
+```
+
+| Action | How |
+|--------|-----|
+| Open history | **Super+V** (Win key + V) |
+| Search | Type in the search box |
+| Paste item | Click or press **Enter** |
+| Pin item | Press **P** |
+| Delete item | Press **Delete** |
+
+LinBoard starts automatically on login after install.
+
+---
 
 ## Features
 
-- Clipboard history — text, URLs, images
-- **Super+V** (Win+V) global hotkey
-- Search, pin, keyboard navigation
-- System tray background app
-- Persistent SQLite storage
-- Auto-paste on select (Wayland: `wtype` / `ydotool`, X11: `xdotool`)
-
-## Installation guide
-
-LinBoard supports **Linux x86_64 (amd64)** and **ARM64 (aarch64)**. You do **not** need Go installed if you use a [release package](https://github.com/Foisalislambd/LinBoard/releases).
-
-### Before you install
-
-| Check | Command |
-|-------|---------|
-| Supported CPU | `uname -m` → `x86_64` or `aarch64` |
-| Session type | `echo $XDG_SESSION_TYPE` → `wayland` or `x11` |
-| Desktop | `echo $XDG_CURRENT_DESKTOP` → GNOME, KDE, XFCE, Cinnamon, etc. |
-
-**Supported desktops:** GNOME, KDE Plasma, XFCE, Cinnamon (X11 and Wayland).
-
-**Recommended (auto-paste):** install a paste tool for your session:
-
-```bash
-# Debian / Ubuntu / Linux Mint / Pop!_OS
-sudo apt update
-sudo apt install wtype xdotool
-
-# Fedora
-sudo dnf install wtype xdotool
-
-# Arch / Manjaro
-sudo pacman -S wtype xdotool
-```
-
-| Session | Tool |
-|---------|------|
-| Wayland | `wtype` (best) or `ydotool` |
-| X11 | `xdotool` |
-
-**GNOME only:** install the [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension so the tray icon appears.
+- Clipboard history — text, links, and images
+- **Super+V** global hotkey on every major Linux desktop
+- Search, pin, and keyboard navigation
+- Runs quietly in the system tray
+- History saved locally (SQLite, your machine only)
+- Auto-paste when you select an item
 
 ---
 
-### Method 1 — One-line install (recommended)
+## Manual install
 
-Downloads the latest release, installs to `~/.local/bin`, sets autostart, and registers **Super+V**.
+Prefer downloading yourself? Get the package for your CPU from **[Releases](https://github.com/Foisalislambd/LinBoard/releases)**:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-```
-
-Install a **specific version** (replace `v1.0.0` with the tag from [Releases](https://github.com/Foisalislambd/LinBoard/releases)):
-
-```bash
-LINBOARD_VERSION=v1.0.0 curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-```
-
-**Custom install location:**
-
-```bash
-LINBOARD_BIN_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-```
-
-Then continue to [After install](#after-install).
-
----
-
-### Method 2 — Manual download (offline / no curl pipe)
-
-**Step 1 — Pick the right file** from [GitHub Releases](https://github.com/Foisalislambd/LinBoard/releases):
-
-| Download | Your system |
-|----------|-------------|
-| `linboard-linux-amd64-v*.tar.gz` | Most PCs and laptops (Intel/AMD 64-bit) |
-| `linboard-linux-arm64-v*.tar.gz` | Raspberry Pi 4+, ARM laptops, ARM VMs |
-
-**Step 2 — Extract and install:**
+| File | For |
+|------|-----|
+| `linboard-linux-amd64-*.tar.gz` | Most PCs (Intel / AMD) |
+| `linboard-linux-arm64-*.tar.gz` | Raspberry Pi 4+, ARM devices |
 
 ```bash
 mkdir -p ~/linboard-install
-tar -xzf linboard-linux-amd64-v1.0.0.tar.gz -C ~/linboard-install
-cd ~/linboard-install
-ls
-# You should see: linboard  install.sh  linboard.desktop  QUICKSTART.txt
-
-chmod +x install.sh
-./install.sh
-```
-
-**Step 3 — Verify checksum (optional):**
-
-```bash
-sha256sum -c linboard-linux-amd64-v1.0.0.tar.gz.sha256
-```
-
-Then continue to [After install](#after-install).
-
----
-
-### Method 3 — Build from source
-
-For developers or distros without a pre-built package. Requires **Go 1.26+**, **gcc**, and GUI libraries.
-
-#### Debian / Ubuntu / Mint
-
-```bash
-git clone https://github.com/Foisalislambd/LinBoard.git
-cd LinBoard
-./scripts/setup.sh
-```
-
-`setup.sh` installs system dependencies, Go (if needed), and builds `./linboard`.
-
-Then install for daily use:
-
-```bash
-./linboard install
-```
-
-#### Fedora
-
-```bash
-sudo dnf install gcc pkg-config libX11-devel libXcursor-devel libXrandr-devel \
-  libXinerama-devel libXi-devel mesa-libGL-devel libXxf86vm-devel \
-  libayatana-appindicator3-devel dbus-devel wtype xdotool
-
-git clone https://github.com/Foisalislambd/LinBoard.git
-cd LinBoard
-go mod tidy
-go build -o linboard ./cmd/linboard
-./linboard install
-```
-
-#### Arch / Manjaro
-
-```bash
-sudo pacman -S gcc pkgconf libx11 libxcursor libxrandr libxinerama libxi \
-  mesa libxxf86vm libayatana-appindicator3 dbus wtype xdotool go
-
-git clone https://github.com/Foisalislambd/LinBoard.git
-cd LinBoard
-go mod tidy
-go build -o linboard ./cmd/linboard
-./linboard install
-```
-
-#### Build only (no system install)
-
-```bash
-make build
-./linboard
+tar -xzf linboard-linux-amd64-*.tar.gz -C ~/linboard-install
+~/linboard-install/install.sh
 ```
 
 ---
 
-### After install
+## After install
 
-**1. Add `~/.local/bin` to PATH** (if `linboard` is not found):
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-For **Zsh**:
+**Command not found?** Add LinBoard to your PATH:
 
 ```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
 ```
 
-**2. Start LinBoard:**
+**Super+V not working?**
 
-```bash
-linboard
-```
+1. Make sure LinBoard is running (`linboard`)
+2. Run `linboard install-shortcut`
+3. Check Settings → Keyboard → look for **LinBoard**
 
-LinBoard runs in the **system tray**. On next login it starts automatically (autostart entry).
-
-**3. Open clipboard history:**
-
-Press **Super+V** (Windows key + V).
-
-**4. Confirm the shortcut is registered:**
-
-- **GNOME / Ubuntu:** Settings → Keyboard → Keyboard Shortcuts → Custom → look for **LinBoard**
-- **KDE:** System Settings → Shortcuts → Custom Shortcuts
-- **XFCE / Cinnamon:** Keyboard settings → Application shortcuts
-
-If missing, run:
-
-```bash
-linboard install-shortcut
-```
-
-**5. Test it:**
-
-1. Copy some text (`Ctrl+C`)
-2. Press **Super+V**
-3. Select an item — it should paste into the active window (needs `wtype` / `xdotool`)
-
-**6. Check version:**
-
-```bash
-linboard version
-```
+**No tray icon on GNOME?**  
+Install the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).
 
 ---
 
-### What gets installed
+## Upgrade
 
-| Path | Purpose |
-|------|---------|
-| `~/.local/bin/linboard` | Main program |
-| `~/.local/share/applications/linboard.desktop` | App menu launcher |
-| `~/.config/autostart/linboard.desktop` | Start on login |
-| `~/.config/linboard/` | Settings and clipboard database |
-
----
-
-### Upgrade
-
-**One-line (latest release):**
+Run the install command again — it always fetches the latest version:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-```
-
-**Manual:** download the new `.tar.gz`, extract, run `./install.sh` again (overwrites the binary).
-
-**From source:**
-
-```bash
-cd LinBoard
-git pull
-make rebuild
-./linboard install
-```
-
-Restart LinBoard after upgrading:
-
-```bash
 pkill linboard; linboard
 ```
 
 ---
 
-### Uninstall
+## Uninstall
 
 ```bash
 pkill linboard 2>/dev/null || true
 rm -f ~/.local/bin/linboard
 rm -f ~/.local/share/applications/linboard.desktop
 rm -f ~/.config/autostart/linboard.desktop
+rm -rf ~/.config/linboard   # optional — removes history
 ```
 
-Remove settings and history (optional):
+Remove the **LinBoard** entry from Settings → Keyboard if it remains.
 
-```bash
-rm -rf ~/.config/linboard
-```
+---
 
-Remove the **Super+V** shortcut manually in your desktop’s keyboard settings (search for **LinBoard**).
+## Settings
 
-## Auto release (maintainers)
-
-Every **`git push origin main`** automatically:
-
-1. Bumps the patch version (`v1.0.0` → `v1.0.1` → `v1.0.2` …)
-2. Creates a Git tag on GitHub
-3. Builds **linux-amd64** + **linux-arm64** packages
-4. Publishes a [GitHub Release](https://github.com/Foisalislambd/LinBoard/releases)
-
-```bash
-git add .
-git commit -m "Your changes"
-git push origin main   # that's it — release runs automatically
-```
-
-| Workflow | When it runs | What it does |
-|----------|--------------|--------------|
-| **CI** (`ci.yml`) | Push / PR to `main` | Quick build + vet |
-| **Release** (`release.yml`) | Push to `main` | Auto tag + version + release packages |
-
-**Skip a release** (docs-only commit): add `[skip release]` to the commit message.
-
-**Manual tag** (optional): you can still `git tag v2.0.0 && git push origin v2.0.0` — the next auto-release continues from that version.
-
-Progress: [Actions → Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `linboard` | Start (system tray) |
-| `linboard toggle` | Show/hide history |
-| `linboard install` | Install binary + autostart + shortcut |
-| `linboard install-shortcut` | Register Super+V only |
-| `make run` | Build and run |
-
-## Hotkey (Super+V)
-
-LinBoard picks the best method automatically:
-
-| Environment | Method |
-|-------------|--------|
-| KDE Plasma 6+ (Wayland) | xdg-desktop-portal |
-| GNOME / Ubuntu | GNOME Custom Shortcut (`gsettings`) |
-| KDE Plasma | KHotKeys (`khotkeysrc`) |
-| XFCE | `xfconf-query` |
-| Cinnamon | Cinnamon keybindings |
-| X11 session | X11 key grab |
-
-All desktop shortcuts run `linboard toggle`, which talks to the running app via IPC.
-
-**Verify:** Settings → Keyboard → look for **LinBoard**
-
-## Requirements
-
-### Runtime (auto-paste)
-
-| Session | Package |
-|---------|---------|
-| Wayland | `wtype` (recommended) or `ydotool` |
-| X11 | `xdotool` |
-
-```bash
-# Debian/Ubuntu
-sudo apt install wtype xdotool
-
-# Fedora
-sudo dnf install wtype xdotool
-
-# Arch
-sudo pacman -S wtype xdotool
-```
-
-### Build
-
-```bash
-# Debian/Ubuntu
-sudo apt install gcc pkg-config libx11-dev libxcursor-dev libxrandr-dev \
-  libxinerama-dev libxi-dev libgl1-mesa-dev libxxf86vm-dev \
-  libayatana-appindicator3-dev libdbus-1-dev
-
-# Fedora
-sudo dnf install gcc pkg-config libX11-devel libXcursor-devel libXrandr-devel \
-  libXinerama-devel libXi-devel mesa-libGL-devel libXxf86vm-devel \
-  libayatana-appindicator3-devel dbus-devel
-
-# Arch
-sudo pacman -S gcc pkgconf libx11 libxcursor libxrandr libxinerama libxi \
-  mesa libxxf86vm libayatana-appindicator3 dbus
-```
-
-GNOME users: install **AppIndicator** extension for tray icon.
-
-## Configuration
-
-`~/.config/linboard/config.json`
+Edit `~/.config/linboard/config.json`:
 
 ```json
 {
   "max_history": 200,
-  "start_minimized": true,
   "paste_on_select": true,
   "theme": "system"
 }
 ```
 
-## Data
+| File | What's stored |
+|------|-----------------|
+| `~/.config/linboard/config.json` | Your settings |
+| `~/.config/linboard/data/history.db` | Clipboard history |
+| `~/.config/linboard/data/images/` | Copied images |
 
-| Path | Content |
-|------|---------|
-| `~/.config/linboard/config.json` | Settings |
-| `~/.config/linboard/data/history.db` | History |
-| `~/.config/linboard/data/images/` | Image clips |
-
-## Development
-
-```bash
-make help
-make build
-make vet
-make test
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+---
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `linboard: command not found` | Add `~/.local/bin` to PATH — see [After install](#after-install) |
-| Super+V does nothing | Run `linboard` first (must stay in tray), then `linboard install-shortcut` |
-| Shortcut not in settings | `linboard install-shortcut` — command must be `~/.local/bin/linboard toggle` |
-| Tray icon missing (GNOME) | Install [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension |
-| Auto-paste fails (Wayland) | `sudo apt install wtype` (or `ydotool`) |
-| Auto-paste fails (X11) | `sudo apt install xdotool` |
-| Hotkey conflict | Remove duplicate binding in Settings → Keyboard |
-| Install script: no release found | Publish a release on GitHub first, or set `LINBOARD_VERSION=v1.0.0` |
-| Wrong architecture | Use `uname -m` — `x86_64` → amd64, `aarch64` → arm64 package |
+| Problem | Solution |
+|---------|----------|
+| `linboard: command not found` | Add `~/.local/bin` to PATH (see above) |
+| Super+V does nothing | Start `linboard`, then run `linboard install-shortcut` |
+| Tray icon missing (GNOME) | Install [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) |
+| Paste doesn't work (Wayland) | `sudo apt install wtype` |
+| Paste doesn't work (X11) | `sudo apt install xdotool` |
+| Hotkey conflict | Remove the old binding in Settings → Keyboard |
+
+---
+
+## Contributing
+
+Want to build from source or help improve LinBoard? See **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## License
 
