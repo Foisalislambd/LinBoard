@@ -43,21 +43,21 @@ Icon=clipboard
 Terminal=false
 Categories=Utility;
 StartupNotify=false
-X-GNOME-Autostart-enabled=true
 `, dest)
 	if err := os.WriteFile(filepath.Join(desktopDir, "linboard.desktop"), []byte(desktop), 0o644); err != nil {
 		return err
 	}
 
-	autostartDir := filepath.Join(share, "applications", "..", "autostart")
-	autostartDir, _ = filepath.Abs(filepath.Join(os.Getenv("HOME"), ".config", "autostart"))
+	autostartDir := filepath.Join(os.Getenv("HOME"), ".config", "autostart")
 	if err := os.MkdirAll(autostartDir, 0o755); err != nil {
 		return err
 	}
 	autostart := desktop + "X-GNOME-Autostart-enabled=true\n"
-	_ = os.WriteFile(filepath.Join(autostartDir, "linboard.desktop"), []byte(autostart), 0o644)
+	if err := os.WriteFile(filepath.Join(autostartDir, "linboard.desktop"), []byte(autostart), 0o644); err != nil {
+		return err
+	}
 
-	if err := hotkey.RegisterSystemShortcut(); err != nil {
+	if err := hotkey.RegisterSystemShortcutAt(dest); err != nil {
 		return fmt.Errorf("installed to %s but shortcut failed: %w", dest, err)
 	}
 

@@ -41,14 +41,12 @@ func setupGNOMEHotkey(exe string) error {
 	bindingPath := "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/" + gnomeBindingName + "/"
 	schema := gnomeMediaKeys + ".custom-keybinding:" + bindingPath
 
-	// Already configured correctly?
+	// Already configured for this binary?
 	if cur, err := gsettingsGet(schema, "command"); err == nil {
-		want := "'" + exe + " toggle'"
 		if strings.Contains(cur, exe) && strings.Contains(cur, "toggle") {
 			_ = gsettingsSet(schema, "binding", "<Super>v")
 			return nil
 		}
-		_ = want
 	}
 
 	paths, err := gsettingsListPaths()

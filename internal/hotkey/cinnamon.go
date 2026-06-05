@@ -32,33 +32,27 @@ func setupCinnamonHotkey(exe string) error {
 	if !hasBin("gsettings") {
 		return fmt.Errorf("gsettings not found")
 	}
-	customKey := "custom0"
-	schema := "org.cinnamon.desktop.keybindings.wm"
-	nameKey := "name"
-	commandKey := "command"
-	bindingKey := "binding"
 
-	// Cinnamon custom keybindings use a different schema; use custom-list approach.
 	listSchema := "org.cinnamon.desktop.keybindings"
 	path := "/org/cinnamon/desktop/keybindings/custom-keybindings/custom-linboard/"
 	fullSchema := listSchema + ".custom-keybinding:" + path
 
-	paths, err := gsettingsListPathsCinnamon()
+	// Cinnamon uses custom-keybindings (same idea as GNOME).
+	paths, err := gsettingsGetArray(listSchema, "custom-keybindings")
 	if err != nil {
-		return err
-	}
-	if !containsPath(paths, path) {
-		paths = append(paths, path)
-		if err := gsettingsSetCinnamon(paths); err != nil {
+		paths, err = gsettingsGetArray(listSchema, "custom-list")
+		if err != nil {
 			return err
 		}
 	}
-
-	_ = nameKey
-	_ = commandKey
-	_ = bindingKey
-	_ = schema
-	_ = customKey
+	if !containsPath(paths, path) {
+		paths = append(paths, path)
+		if err := gsettingsSetArray(listSchema, "custom-keybindings", paths); err != nil {
+			if err2 := gsettingsSetArray(listSchema, "custom-list", paths); err2 != nil {
+				return err
+			}
+		}
+	}
 
 	if err := gsettingsSet(fullSchema, "name", "LinBoard"); err != nil {
 		return err
@@ -69,33 +63,33 @@ func setupCinnamonHotkey(exe string) error {
 	return gsettingsSet(fullSchema, "binding", "<Super>v")
 }
 
-func gsettingsListPathsCinnamon() ([]string, error) {
-	out, err := execOutput("gsettings", "get", "org.cinnamon.desktop.keybindings", "custom-list")
+func gsettingsGetArray(schema, key string) ([]string, error) {
+	out, err := execOutput("gsettings", "get", schema, key)
 	if err != nil {
 		return nil, err
 	}
 	return parseGSettingsStringArray(out), nil
 }
 
-func gsettingsSetCinnamon(paths []string) error {
+func gsettingsSetArray(schema, key string, paths []string) error {
 	if len(paths) == 0 {
-		return run("gsettings", "set", "org.cinnamon.desktop.keybindings", "custom-list", "[]")
+		return run("gsettings", "set", schema, key, "[]")
 	}
 	var quoted []string
 	for _, p := range paths {
 		quoted = append(quoted, "'"+p+"'")
 	}
-	val := "[" + joinQuoted(quoted) + "]"
-	return run("gsettings", "set", "org.cinnamon.desktop.keybindings", "custom-list", val)
+	val := "[" + stringsJoin(quoted, ", ") + "]"
+	return run("gsettings", "set", schema, key, val)
 }
 
-func joinQuoted(parts []string) string {
-	s := ""
-	for i, p := range parts {
-		if i > 0 {
-			s += ", "
-		}
-		s += p
+func stringsJoin(parts []string, sep string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	s := parts[0]
+	for _, p := range parts[1:] {
+		s += sep + p
 	}
 	return s
 }

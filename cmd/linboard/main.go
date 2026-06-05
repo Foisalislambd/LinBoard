@@ -51,7 +51,7 @@ func main() {
 	release, err := singleinstance.Acquire()
 	if err != nil {
 		log.Println(err)
-		os.Exit(0)
+		return // already running — toggle was sent via IPC
 	}
 	defer release()
 

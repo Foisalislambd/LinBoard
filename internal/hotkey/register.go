@@ -16,6 +16,11 @@ func RegisterSystemShortcut() error {
 	if err != nil {
 		return err
 	}
+	return RegisterSystemShortcutAt(exe)
+}
+
+// RegisterSystemShortcutAt binds Super+V using a specific binary path.
+func RegisterSystemShortcutAt(exe string) error {
 	return registerSystemShortcut(exe)
 }
 
