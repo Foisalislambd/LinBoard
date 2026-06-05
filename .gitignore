@@ -1,0 +1,37 @@
+# Binaries
+/linboard
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build & test
+*.test
+*.out
+*.prof
+coverage.txt
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Vendor (if not committed)
+/vendor/
+
+# IDE & editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Fyne bundled resources (generated)
+fyne_bundle.go
+
+# Debug & temp
+*.log
+tmp/
+dist/
