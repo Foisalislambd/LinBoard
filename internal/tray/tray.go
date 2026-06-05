@@ -3,7 +3,7 @@ package tray
 import (
 	"fmt"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 
 	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/config"
@@ -21,9 +21,9 @@ func New(cfg *config.Config) *Tray {
 	return &Tray{cfg: cfg}
 }
 
-func (t *Tray) OnShow(fn func())     { t.onShow = fn }
-func (t *Tray) OnClear(fn func())    { t.onClear = fn }
-func (t *Tray) OnQuit(fn func())     { t.onQuit = fn }
+func (t *Tray) OnShow(fn func())  { t.onShow = fn }
+func (t *Tray) OnClear(fn func()) { t.onClear = fn }
+func (t *Tray) OnQuit(fn func())  { t.onQuit = fn }
 
 func (t *Tray) Run(onReady func()) {
 	systray.Run(func() {

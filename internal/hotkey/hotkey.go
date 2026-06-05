@@ -57,22 +57,13 @@ func (m *Manager) Start() error {
 		}
 	}
 
-	// 3) Try any supported DE registration (e.g. Ubuntu on GNOME)
-	if err := RegisterSystemShortcut(); err == nil {
+	// 3) Register Super+V via gsettings/khotkeys/etc. → `linboard toggle` (IPC)
+	if regErr := RegisterSystemShortcut(); regErr == nil {
 		log.Printf("hotkey registered (system): %s → linboard toggle", config.HotkeyLabel)
 		m.backend = &noopBackend{}
 		return nil
 	} else {
-		log.Printf("hotkey: system registration: %v", err)
-	}
-
-	// 4) X11 low-level grab
-	if !platform.UsePortalHotkey() {
-		m.backend = newX11Backend()
-		if err := m.backend.start(m.onPress); err != nil {
-			return err
-		}
-		return nil
+		log.Printf("hotkey: system registration: %v", regErr)
 	}
 
 	return fmt.Errorf("could not bind %s — run: linboard install-shortcut", config.HotkeyLabel)

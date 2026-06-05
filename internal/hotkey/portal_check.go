@@ -1,22 +1,20 @@
 package hotkey
 
 import (
+	"os/exec"
 	"strings"
-
-	"github.com/godbus/dbus/v5"
 )
 
 func portalHasGlobalShortcuts() bool {
-	conn, err := dbus.SessionBus()
+	if !hasBin("gdbus") {
+		return false
+	}
+	out, err := exec.Command("gdbus", "introspect", "--session",
+		"--dest", portalBusName,
+		"--object-path", portalObjectPath,
+	).Output()
 	if err != nil {
 		return false
 	}
-	defer conn.Close()
-
-	obj := conn.Object(portalBusName, dbus.ObjectPath(portalObjectPath))
-	var xml string
-	if err := obj.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&xml); err != nil {
-		return false
-	}
-	return strings.Contains(xml, portalIface)
+	return strings.Contains(string(out), portalIface)
 }
