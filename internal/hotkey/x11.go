@@ -15,7 +15,7 @@ type x11Backend struct {
 
 func (b *x11Backend) start(onPress func()) error {
 	b.onPress = onPress
-	// Super/Win = Mod4 on X11 (same as CopyQ's Mod4Mask / Qt::MetaModifier)
+	// Super/Win = Mod4 on X11
 	b.hk = hotkey.New([]hotkey.Modifier{hotkey.Mod4}, hotkey.KeyV)
 	if err := b.hk.Register(); err != nil {
 		return err

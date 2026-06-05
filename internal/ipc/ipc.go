@@ -28,7 +28,7 @@ func SocketPath() (string, error) {
 }
 
 // Toggle asks a running LinBoard instance to show/hide history.
-// Use this as a GNOME/KDE custom keyboard shortcut command (CopyQ-style fallback).
+// Use this as a GNOME/KDE custom keyboard shortcut command.
 func Toggle() error {
 	path, err := SocketPath()
 	if err != nil {

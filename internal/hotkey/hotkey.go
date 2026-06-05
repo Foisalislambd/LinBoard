@@ -47,7 +47,7 @@ func (m *Manager) Start() error {
 		log.Printf("hotkey: portal GlobalShortcuts not available")
 	}
 
-	// 2) Desktop environment system shortcut → linboard toggle (CopyQ-style)
+	// 2) Desktop environment system shortcut → linboard toggle
 	if b := desktopBackend(); b != nil {
 		m.backend = b
 		if err := m.backend.start(m.onPress); err != nil {
