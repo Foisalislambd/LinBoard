@@ -29,9 +29,29 @@
 
 ```bash
 ./scripts/setup.sh
+# or
+make setup
 ```
 
 This installs system dependencies, verifies Go 1.26.4, and builds the binary.
+
+## Build & dev commands
+
+```bash
+make build        # build ./linboard
+make run          # build + run
+make rebuild      # clean + build
+make clean        # remove binary
+make clean-all    # remove binary + Go cache
+make deps         # go mod tidy + download
+make test         # run tests
+make vet          # static analysis
+make install      # install to ~/.local/bin
+make stop         # stop running LinBoard
+make help         # all commands
+```
+
+Same via script: `./scripts/dev.sh <command>`
 
 ## Requirements
 
