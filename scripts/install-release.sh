@@ -52,9 +52,7 @@ TARBALL="${ASSET}-v${VER}.tar.gz"
 URL="https://github.com/${REPO}/releases/download/${VERSION_TAG}/${TARBALL}"
 
 linboard_log "LinBoard ${VERSION_TAG} (${ASSET})"
-linboard_log "Downloading..."
-
-curl -fsSL "$URL" -o "$TMP/$TARBALL"
+linboard_download "$URL" "$TMP/$TARBALL" "$TARBALL"
 tar -xzf "$TMP/$TARBALL" -C "$TMP"
 
 # Bundle system-setup for install.sh

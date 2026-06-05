@@ -49,6 +49,40 @@ linboard_detect_session() {
 
 linboard_have() { command -v "$1" >/dev/null 2>&1; }
 
+linboard_bytes_to_mb() {
+  awk "BEGIN {printf \"%.2f\", ${1:-0}/1048576}"
+}
+
+# Download with size hint and live progress bar (when stdout is a terminal).
+linboard_download() {
+  local url="$1"
+  local dest="$2"
+  local label="${3:-$(basename "$dest")}"
+
+  local total_bytes=""
+  total_bytes="$(curl -fsSLI "$url" 2>/dev/null | grep -i '^content-length:' | tail -1 | awk '{print $2}' | tr -d '\r')" || true
+
+  if [[ -n "$total_bytes" && "$total_bytes" =~ ^[0-9]+$ ]]; then
+    linboard_log "Downloading ${label} ($(linboard_bytes_to_mb "$total_bytes") MB)..."
+  else
+    linboard_log "Downloading ${label}..."
+  fi
+
+  if [[ -t 1 ]]; then
+    # Live progress bar (speed + % when Content-Length known)
+    curl -fL --progress-bar "$url" -o "$dest"
+    echo ""
+  else
+    curl -fSL "$url" -o "$dest"
+  fi
+
+  if [[ -f "$dest" ]]; then
+    local size
+    size="$(stat -c%s "$dest" 2>/dev/null || stat -f%z "$dest")"
+    linboard_log "Download complete: $(linboard_bytes_to_mb "$size") MB"
+  fi
+}
+
 linboard_sudo() {
   if linboard_have sudo; then
     sudo "$@"
