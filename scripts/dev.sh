@@ -35,6 +35,7 @@ Commands:
   install     Full install (~/.local/bin + autostart + Super+V)
   install-shortcut  Register Super+V only
   stop        Stop running LinBoard process
+  clean-legacy  Remove old ~/.local install + legacy history.db
   help        Show this help
 
 Examples:
@@ -130,6 +131,49 @@ cmd_stop() {
   cmd_stop_quiet
 }
 
+cmd_clean_legacy() {
+  cmd_stop_quiet
+
+  local removed=0
+  if [[ -x "${HOME}/.local/bin/linboard" ]]; then
+    rm -f "${HOME}/.local/bin/linboard"
+    echo "==> Removed ~/.local/bin/linboard"
+    removed=1
+  fi
+
+  local data="${HOME}/.config/linboard/data"
+  for legacy in history.db history.db.migrated history.db-wal history.db-shm; do
+    if [[ -f "${data}/${legacy}" ]]; then
+      rm -f "${data}/${legacy}"
+      echo "==> Removed ${data}/${legacy}"
+      removed=1
+    fi
+  done
+
+  if [[ -f "${HOME}/.config/autostart/linboard.desktop" ]]; then
+    rm -f "${HOME}/.config/autostart/linboard.desktop"
+    echo "==> Removed autostart entry"
+    removed=1
+  fi
+
+  if [[ -x "$ROOT/$BINARY" ]] && command -v gsettings >/dev/null 2>&1; then
+    local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom-linboard/"
+    local cur
+    cur="$(gsettings get "$schema" command 2>/dev/null || true)"
+    if [[ "$cur" == *".local/bin/linboard"* ]]; then
+      gsettings set "$schema" command "$ROOT/$BINARY toggle"
+      echo "==> GNOME shortcut → $ROOT/$BINARY toggle"
+      removed=1
+    fi
+  fi
+
+  if [[ "$removed" -eq 0 ]]; then
+    echo "==> No legacy LinBoard install found."
+  else
+    echo "==> Legacy cleanup done. Dev binary: $ROOT/$BINARY"
+  fi
+}
+
 case "${1:-help}" in
   build)       shift; cmd_build "$@" ;;
   run)         shift; cmd_run "$@" ;;
@@ -144,6 +188,7 @@ case "${1:-help}" in
   install)     shift; cmd_install "$@" ;;
   install-shortcut) shift; cmd_install_shortcut "$@" ;;
   stop)        shift; cmd_stop "$@" ;;
+  clean-legacy) shift; cmd_clean_legacy "$@" ;;
   help|-h|--help) usage ;;
   *)
     echo "Unknown command: $1"
