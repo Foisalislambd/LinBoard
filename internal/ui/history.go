@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/store"
@@ -45,6 +46,7 @@ func NewHistoryWindow(app fyne.App, s *store.Store, cfg *config.Config) *History
 
 func (h *HistoryWindow) build() {
 	h.win = h.app.NewWindow("LinBoard — Clipboard History")
+	h.win.SetIcon(assets.Fyne())
 	h.win.SetFixedSize(true)
 	h.win.Resize(fyne.NewSize(480, 420))
 	h.win.SetCloseIntercept(func() {

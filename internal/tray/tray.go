@@ -5,6 +5,7 @@ import (
 
 	"github.com/getlantern/systray"
 
+	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/config"
 )
 
@@ -38,6 +39,7 @@ func (t *Tray) Run(onReady func()) {
 }
 
 func (t *Tray) setup() {
+	systray.SetIcon(assets.TrayPNG())
 	systray.SetTitle("LinBoard")
 	systray.SetTooltip("LinBoard — Clipboard Manager (" + config.HotkeyLabel + ")")
 

@@ -143,6 +143,24 @@ linboard_install_gnome_tray() {
   fi
 }
 
+linboard_install_theme_icons() {
+  local icons_root="$1"
+  [[ -d "$icons_root/hicolor" ]] || return 0
+
+  local dest="$HOME/.local/share/icons"
+  mkdir -p "$dest/hicolor"
+
+  linboard_log "Installing application icon..."
+  cp -r "$icons_root/hicolor/." "$dest/hicolor/"
+
+  if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t "$dest" >/dev/null 2>&1 || true
+  fi
+  if command -v update-icon-caches >/dev/null 2>&1; then
+    update-icon-caches "$dest" >/dev/null 2>&1 || true
+  fi
+}
+
 linboard_ensure_path() {
   local bin_dir="$1"
   [[ -z "$bin_dir" ]] && return 0

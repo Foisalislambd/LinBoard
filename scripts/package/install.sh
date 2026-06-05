@@ -27,6 +27,15 @@ fi
 
 install -m 755 "$ROOT/linboard" "$BIN_DIR/linboard"
 
+if [[ -d "$ROOT/icons" ]]; then
+  if declare -F linboard_install_theme_icons >/dev/null 2>&1; then
+    linboard_install_theme_icons "$ROOT/icons"
+  else
+    mkdir -p "$HOME/.local/share/icons/hicolor"
+    cp -r "$ROOT/icons/hicolor/." "$HOME/.local/share/icons/hicolor/" 2>/dev/null || true
+  fi
+fi
+
 sed "s|@EXEC@|$BIN_DIR/linboard|g" "$ROOT/linboard.desktop" > "$DESKTOP_DIR/linboard.desktop"
 chmod 644 "$DESKTOP_DIR/linboard.desktop"
 

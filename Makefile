@@ -1,6 +1,6 @@
 # LinBoard — make targets (wrapper around scripts/dev.sh)
 
-.PHONY: help build run rebuild clean clean-cache clean-all deps test vet setup install install-shortcut stop
+.PHONY: help build run rebuild clean clean-cache clean-all deps test vet setup install install-shortcut icons stop
 
 help:
 	@./scripts/dev.sh help
@@ -40,6 +40,9 @@ install:
 
 install-shortcut:
 	@./linboard install-shortcut
+
+icons:
+	@python3 scripts/generate-icons.py
 
 stop:
 	@./scripts/dev.sh stop

@@ -12,6 +12,7 @@ import (
 	fyneapp "fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
 
+	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/hotkey"
@@ -57,7 +58,7 @@ func New() (*App, error) {
 	}
 
 	a.fyneApp = fyneapp.NewWithID("com.linboard.app")
-	a.fyneApp.SetIcon(nil)
+	a.fyneApp.SetIcon(assets.Fyne())
 
 	switch cfg.Theme {
 	case "dark":

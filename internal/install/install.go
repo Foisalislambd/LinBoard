@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/hotkey"
 )
 
@@ -39,7 +40,7 @@ Name=LinBoard
 GenericName=Clipboard Manager
 Comment=Windows-style clipboard history for Linux
 Exec=%s
-Icon=clipboard
+Icon=linboard
 Terminal=false
 Categories=Utility;
 StartupNotify=false
@@ -55,6 +56,10 @@ StartupNotify=false
 	autostart := desktop + "X-GNOME-Autostart-enabled=true\n"
 	if err := os.WriteFile(filepath.Join(autostartDir, "linboard.desktop"), []byte(autostart), 0o644); err != nil {
 		return err
+	}
+
+	if err := assets.InstallThemeIcons(); err != nil {
+		return fmt.Errorf("install icons: %w", err)
 	}
 
 	if err := hotkey.RegisterSystemShortcutAt(dest); err != nil {
