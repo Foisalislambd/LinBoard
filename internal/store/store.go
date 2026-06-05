@@ -189,6 +189,26 @@ func (s *Store) AddImage(data []byte) (*Clip, error) {
 }
 
 func (s *Store) prune() {
+	if s.maxItems < 1 {
+		return
+	}
+	rows, err := s.db.Query(`
+		SELECT image_path FROM clips
+		WHERE pinned = 0 AND image_path != '' AND id NOT IN (
+			SELECT id FROM clips
+			ORDER BY pinned DESC, created_at DESC
+			LIMIT ?
+		)
+	`, s.maxItems)
+	if err == nil {
+		for rows.Next() {
+			var p string
+			if rows.Scan(&p) == nil && p != "" {
+				_ = os.Remove(p)
+			}
+		}
+		rows.Close()
+	}
 	_, _ = s.db.Exec(`
 		DELETE FROM clips WHERE id NOT IN (
 			SELECT id FROM clips

@@ -1,6 +1,7 @@
 package clipboard
 
 import (
+	"fmt"
 	"log"
 	"os/exec"
 
@@ -22,7 +23,7 @@ func simulatePaste() error {
 		return nil
 	}
 	log.Printf("auto-paste: no tool found (install wtype, ydotool, or xdotool) — content is on clipboard")
-	return nil
+	return fmt.Errorf("no paste tool found (install wtype, ydotool, or xdotool)")
 }
 
 type pasteTool struct {

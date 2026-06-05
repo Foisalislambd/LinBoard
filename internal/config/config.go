@@ -94,7 +94,14 @@ func Load() (*Config, error) {
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	cfg.normalize()
 	return cfg, nil
+}
+
+func (c *Config) normalize() {
+	if c.MaxHistory < 1 {
+		c.MaxHistory = Default().MaxHistory
+	}
 }
 
 func (c *Config) Save() error {

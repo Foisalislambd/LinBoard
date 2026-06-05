@@ -188,6 +188,15 @@ func (h *HistoryWindow) handleKey(ev *fyne.KeyEvent) {
 	}
 }
 
+func (h *HistoryWindow) RefreshIfVisible() {
+	h.mu.Lock()
+	visible := h.visible
+	h.mu.Unlock()
+	if visible {
+		h.refreshList()
+	}
+}
+
 func (h *HistoryWindow) refreshList() {
 	search := strings.TrimSpace(h.search.Text)
 	clips, err := h.store.List(search, 100)

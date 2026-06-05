@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -50,8 +51,10 @@ func main() {
 
 	release, err := singleinstance.Acquire()
 	if err != nil {
-		log.Println(err)
-		return // already running — toggle was sent via IPC
+		if errors.Is(err, singleinstance.ErrAlreadyRunning) {
+			return // second launch — toggle forwarded via IPC
+		}
+		log.Fatal(err)
 	}
 	defer release()
 

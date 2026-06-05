@@ -1,14 +1,19 @@
 package singleinstance
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/ipc"
 )
+
+// ErrAlreadyRunning is returned when another LinBoard instance holds the lock.
+var ErrAlreadyRunning = errors.New("LinBoard is already running")
 
 // Acquire ensures only one LinBoard GUI instance runs. Returns a release func.
 func Acquire() (func(), error) {
@@ -27,9 +32,11 @@ func Acquire() (func(), error) {
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
-		// Already running — forward toggle if user launched again
-		_ = ipc.Toggle()
-		return nil, fmt.Errorf("LinBoard is already running")
+		// Already running — forward toggle (retry while IPC server starts)
+		if toggleErr := ipc.ToggleWithRetry(15, 100*time.Millisecond); toggleErr != nil {
+			return nil, fmt.Errorf("%w: %v", ErrAlreadyRunning, toggleErr)
+		}
+		return nil, ErrAlreadyRunning
 	}
 	return func() {
 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)

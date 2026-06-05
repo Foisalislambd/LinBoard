@@ -3,10 +3,17 @@
 set -euo pipefail
 
 GO_VERSION="1.26.4"
-GO_ARCH="linux-amd64"
+case "$(uname -m)" in
+  x86_64)  GO_ARCH="linux-amd64" ;;
+  aarch64) GO_ARCH="linux-arm64" ;;
+  *)
+    echo "Unsupported CPU: $(uname -m) (need x86_64 or aarch64)"
+    exit 1
+    ;;
+esac
 GO_TAR="go${GO_VERSION}.${GO_ARCH}.tar.gz"
 GO_URL="https://go.dev/dl/${GO_TAR}"
-GO_SHA="1153d3d50e0ac764b447adfe05c2bcf08e889d42a02e0fe0259bd47f6733ad7f"
+GO_SHA_URL="https://go.dev/dl/${GO_TAR}.sha256"
 
 echo "==> Installing build dependencies..."
 sudo apt-get update -qq
@@ -25,6 +32,7 @@ else
   echo "    Installing Go $GO_VERSION to /usr/local/go ..."
   tmp=$(mktemp -d)
   curl -fsSL "$GO_URL" -o "$tmp/$GO_TAR"
+  GO_SHA="$(curl -fsSL "$GO_SHA_URL" | awk '{print $1}')"
   echo "$GO_SHA  $tmp/$GO_TAR" | sha256sum -c -
   sudo rm -rf /usr/local/go
   sudo tar -C /usr/local -xzf "$tmp/$GO_TAR"

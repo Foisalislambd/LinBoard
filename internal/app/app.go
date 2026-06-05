@@ -80,9 +80,10 @@ func (a *App) showHistory() {
 	}, false)
 }
 
-func (a *App) showHistoryWindow() {
+func (a *App) onClipboardChange() {
+	a.updateTrayCount()
 	a.fyneApp.Driver().DoFromGoroutine(func() {
-		a.history.Show()
+		a.history.RefreshIfVisible()
 	}, false)
 }
 
@@ -90,11 +91,7 @@ func (a *App) Run() {
 	log.Printf("LinBoard %s — %s / %s (paste: %s)",
 		config.AppVersion, platform.SessionDescription(), platform.DesktopName(), clipboard.PasteToolName())
 
-	a.monitor.OnChange(a.updateTrayCount)
-	a.monitor.Start(a.ctx)
-
-	a.hotkey.OnPress(a.showHistory)
-
+	// Start IPC first so Super+V works while the rest of the app initializes.
 	ipcSrv, err := ipc.StartServer(a.showHistory)
 	if err != nil {
 		log.Printf("ipc server failed: %v", err)
@@ -102,7 +99,12 @@ func (a *App) Run() {
 		a.ipc = ipcSrv
 	}
 
-	a.tray.OnShow(a.showHistoryWindow)
+	a.monitor.OnChange(a.onClipboardChange)
+	a.monitor.Start(a.ctx)
+
+	a.hotkey.OnPress(a.showHistory)
+
+	a.tray.OnShow(a.showHistory)
 	a.tray.OnClear(func() {
 		if err := a.store.ClearUnpinned(); err != nil {
 			log.Printf("clear history: %v", err)

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/foisal/linboard/internal/config"
 )
@@ -40,6 +41,22 @@ func Toggle() error {
 	defer conn.Close()
 	_, err = io.WriteString(conn, "toggle\n")
 	return err
+}
+
+// ToggleWithRetry retries Toggle while the main instance is still starting its IPC server.
+func ToggleWithRetry(attempts int, delay time.Duration) error {
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		if err := Toggle(); err == nil {
+			return nil
+		} else {
+			lastErr = err
+			if i+1 < attempts {
+				time.Sleep(delay)
+			}
+		}
+	}
+	return lastErr
 }
 
 // Server handles local IPC while LinBoard is running.

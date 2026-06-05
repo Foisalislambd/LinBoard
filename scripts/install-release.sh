@@ -7,7 +7,6 @@ set -euo pipefail
 
 REPO="${LINBOARD_REPO:-Foisalislambd/LinBoard}"
 VERSION="${LINBOARD_VERSION:-latest}"
-INSTALL_DIR="${LINBOARD_INSTALL_DIR:-$HOME/.local/linboard}"
 BIN_DIR="${LINBOARD_BIN_DIR:-$HOME/.local/bin}"
 
 arch="$(uname -m)"
@@ -25,6 +24,10 @@ if [ "$VERSION" = "latest" ]; then
   VERSION_TAG="$(curl -fsSL "$API" | grep -oP '"tag_name"\s*:\s*"\K[^"]+' | head -1)"
 else
   VERSION_TAG="$VERSION"
+  case "$VERSION_TAG" in
+    v*) ;;
+    *) VERSION_TAG="v${VERSION_TAG}" ;;
+  esac
 fi
 
 if [ -z "$VERSION_TAG" ]; then
