@@ -41,8 +41,10 @@ func (t *Tray) setup() {
 	systray.SetTitle("LinBoard")
 	systray.SetTooltip("LinBoard — Clipboard Manager (" + t.cfg.HotkeyLabel() + ")")
 
-	mShow := systray.AddMenuItem("Show History", "Open clipboard history")
-	mShow.SetShortcut("Ctrl+Shift+V")
+	mShow := systray.AddMenuItem(
+		"Show History ("+t.cfg.HotkeyLabel()+")",
+		"Open clipboard history",
+	)
 	systray.AddSeparator()
 
 	t.countItem = systray.AddMenuItem("0 items in history", "")
@@ -50,7 +52,6 @@ func (t *Tray) setup() {
 
 	systray.AddSeparator()
 	mClear := systray.AddMenuItem("Clear History", "Remove all unpinned items")
-	mClear.SetShortcut("")
 
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit LinBoard", "Exit the application")
