@@ -31,10 +31,30 @@ func main() {
 			}
 			return
 		case "install-shortcut":
-			if err := hotkey.RegisterSystemShortcut(); err != nil {
+			exe, err := hotkey.ExecutableForShortcut()
+			if err != nil {
 				log.Fatal(err)
 			}
-			fmt.Println("Super+V shortcut registered.")
+			if err := hotkey.SetupAt(exe); err != nil {
+				log.Fatal(err)
+			}
+			report := hotkey.Verify(exe)
+			hotkey.PrintVerify(report)
+			if !report.Healthy() {
+				os.Exit(1)
+			}
+			return
+		case "doctor":
+			exe, err := hotkey.ExecutableForShortcut()
+			if err != nil {
+				log.Fatal(err)
+			}
+			_ = hotkey.SetupAt(exe)
+			report := hotkey.Verify(exe)
+			hotkey.PrintVerify(report)
+			if !report.Healthy() {
+				os.Exit(1)
+			}
 			return
 		case "version", "-v", "--version":
 			fmt.Printf("LinBoard %s\n", config.AppVersion)
@@ -74,6 +94,7 @@ Usage:
   linboard toggle           Show/hide history (used by Super+V shortcut)
   linboard install          Install to ~/.local/bin + autostart + Super+V
   linboard install-shortcut Register Super+V only
+  linboard doctor           Check shortcut & dependencies
   linboard version          Print version
   linboard help             Show this help
 

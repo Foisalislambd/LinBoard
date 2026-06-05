@@ -92,7 +92,7 @@ func New() (*App, error) {
 func (a *App) showHistory() {
 	a.fyneApp.Driver().DoFromGoroutine(func() {
 		a.history.Toggle()
-	}, false)
+	}, true)
 }
 
 func (a *App) onClipboardChange() {

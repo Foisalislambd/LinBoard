@@ -62,13 +62,18 @@ StartupNotify=false
 		return fmt.Errorf("install icons: %w", err)
 	}
 
-	if err := hotkey.RegisterSystemShortcutAt(dest); err != nil {
-		return fmt.Errorf("installed to %s but shortcut failed: %w", dest, err)
+	if err := hotkey.SetupAt(dest); err != nil {
+		return fmt.Errorf("shortcut setup failed: %w", err)
 	}
 
+	report := hotkey.Verify(dest)
+	hotkey.PrintVerify(report)
+
 	fmt.Printf("Installed: %s\n", dest)
-	fmt.Println("Super+V shortcut registered. Log out/in or restart LinBoard.")
-	fmt.Println("Add ~/.local/bin to PATH if needed.")
+	fmt.Println("LinBoard starts automatically on login.")
+	if !report.Healthy() {
+		return fmt.Errorf("install finished with shortcut issues — run: linboard doctor")
+	}
 	return nil
 }
 
@@ -90,5 +95,5 @@ func copyFile(src, dst string) error {
 
 func HasLocalBin() bool {
 	_, err := exec.LookPath("linboard")
-	return err == nil
+	return err != nil
 }

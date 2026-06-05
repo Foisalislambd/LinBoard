@@ -21,10 +21,18 @@ func RegisterSystemShortcut() error {
 
 // RegisterSystemShortcutAt binds Super+V using a specific binary path.
 func RegisterSystemShortcutAt(exe string) error {
-	return registerSystemShortcut(exe)
+	return SetupAt(exe)
 }
 
 func executablePath() (string, error) {
+	return ExecutableForShortcut()
+}
+
+// ExecutableForShortcut returns the binary used for Super+V (prefer ~/.local/bin).
+func ExecutableForShortcut() (string, error) {
+	if local := filepath.Join(os.Getenv("HOME"), ".local", "bin", "linboard"); fileExecutable(local) {
+		return local, nil
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return "", err
@@ -32,12 +40,17 @@ func executablePath() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
+func fileExecutable(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir() && st.Mode()&0o111 != 0
+}
+
 func registerSystemShortcut(exe string) error {
 	backends := []struct {
 		name string
 		fn   func(string) error
 	}{
-		{"GNOME", setupGNOMEHotkey},
+		{"GNOME", setupGNOME},
 		{"KDE", setupKDEHotkey},
 		{"XFCE", setupXFCEHotkey},
 		{"Cinnamon", setupCinnamonHotkey},

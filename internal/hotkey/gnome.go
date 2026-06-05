@@ -10,33 +10,27 @@ import (
 
 const (
 	gnomeShellKeybindings = "org.gnome.shell.keybindings"
-	gnomeMessageTrayKey   = "toggle-message-tray"
+	gnomeMessageTrayKey     = "toggle-message-tray"
 )
 
 const gnomeBindingName = "custom-linboard"
 
-// gnomeBackend registers Super+V via GNOME Settings (gsettings).
-// GNOME runs `linboard toggle`; IPC opens the history window.
 type gnomeBackend struct{}
 
 func (b *gnomeBackend) start(_ func()) error {
-	if err := releaseGNOMESuperVConflict(); err != nil {
-		log.Printf("hotkey: GNOME Super+V conflict: %v", err)
-	}
-	if gnomeHotkeyConfigured() {
-		log.Printf("hotkey using GNOME shortcut: %s → linboard toggle", config.HotkeyLabel)
-		return nil
-	}
 	exe, err := executablePath()
 	if err != nil {
 		return err
 	}
-	if err := setupGNOMEHotkey(exe); err != nil {
+	if err := setupGNOME(exe); err != nil {
 		return err
 	}
-	log.Printf("hotkey registered (GNOME): %s → linboard toggle", config.HotkeyLabel)
+	wrapper, _ := ToggleWrapperPath()
+	log.Printf("hotkey ready (GNOME): %s → %s", config.HotkeyLabel, wrapper)
 	return nil
 }
+
+func (b *gnomeBackend) stop() {}
 
 func gnomeBindingPath() string {
 	return "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/" + gnomeBindingName + "/"
@@ -46,32 +40,26 @@ func gnomeBindingSchema() string {
 	return gnomeMediaKeys + ".custom-keybinding:" + gnomeBindingPath()
 }
 
-func gnomeHotkeyConfigured() bool {
-	if !platform.IsGNOME() {
-		return false
-	}
-	cur, err := gsettingsCommand(gnomeBindingSchema(), "command")
-	if err != nil {
-		return false
-	}
-	return strings.Contains(cur, "linboard") && strings.Contains(cur, "toggle")
-}
-
-func (b *gnomeBackend) stop() {}
-
-func setupGNOMEHotkey(exe string) error {
+func setupGNOME(exe string) error {
 	if !platform.IsGNOME() {
 		return skip("not GNOME")
 	}
+	if err := ensureGNOMEMediaKeys(); err != nil && !isSkipErr(err) {
+		log.Printf("hotkey: %v", err)
+	}
+	if err := releaseGNOMESuperVConflict(); err != nil {
+		return err
+	}
+	wrapper, err := EnsureToggleWrapper(exe)
+	if err != nil {
+		return err
+	}
+	return applyGNOMEHotkey(wrapper)
+}
 
+func applyGNOMEHotkey(command string) error {
 	schema := gnomeBindingSchema()
 	bindingPath := gnomeBindingPath()
-
-	if cur, err := gsettingsCommand(schema, "command"); err == nil {
-		if strings.Contains(cur, exe) && strings.Contains(cur, "toggle") {
-			return nil
-		}
-	}
 
 	paths, err := gsettingsListPaths()
 	if err != nil {
@@ -87,17 +75,12 @@ func setupGNOMEHotkey(exe string) error {
 	if err := gsettingsSet(schema, "name", "LinBoard"); err != nil {
 		return err
 	}
-	if err := gsettingsSet(schema, "command", exe+" toggle"); err != nil {
+	if err := gsettingsSet(schema, "command", command); err != nil {
 		return err
 	}
-	if err := gsettingsSet(schema, "binding", "<Super>v"); err != nil {
-		return err
-	}
-	return releaseGNOMESuperVConflict()
+	return gsettingsSet(schema, "binding", "<Super>v")
 }
 
-// releaseGNOMESuperVConflict removes Super+V from GNOME Shell's message tray binding.
-// Shell keybindings take priority over custom media-keys shortcuts.
 func releaseGNOMESuperVConflict() error {
 	bindings, err := gsettingsGetArray(gnomeShellKeybindings, gnomeMessageTrayKey)
 	if err != nil {
@@ -118,6 +101,6 @@ func releaseGNOMESuperVConflict() error {
 	if err := gsettingsSetArray(gnomeShellKeybindings, gnomeMessageTrayKey, kept); err != nil {
 		return err
 	}
-	log.Printf("hotkey: released %s from GNOME message tray (now free for LinBoard)", config.HotkeyLabel)
+	log.Printf("hotkey: freed %s from GNOME message tray", config.HotkeyLabel)
 	return nil
 }

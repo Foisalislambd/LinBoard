@@ -149,6 +149,26 @@ linboard_install_paste_tools() {
   linboard_install_packages "${need[@]}" || true
 }
 
+linboard_ensure_gnome_media_keys() {
+  linboard_detect_session
+  [[ "$LINBOARD_DESKTOP_LC" != *gnome* ]] && return 0
+
+  if busctl --user status org.gnome.SettingsDaemon.MediaKeys >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [[ -x /usr/libexec/gsd-media-keys ]]; then
+    linboard_log "Starting GNOME media-keys (required for Super+V)..."
+    /usr/libexec/gsd-media-keys >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+    sleep 0.5
+  fi
+
+  if ! busctl --user status org.gnome.SettingsDaemon.MediaKeys >/dev/null 2>&1; then
+    linboard_warn "gsd-media-keys not running — install gnome-settings-daemon if Super+V fails"
+  fi
+}
+
 linboard_install_gnome_tray() {
   linboard_detect_session
   [[ "$LINBOARD_DESKTOP_LC" != *gnome* ]] && return 0
@@ -280,6 +300,7 @@ linboard_preflight_setup() {
   linboard_install_clipboard_tools
   linboard_install_paste_tools
   linboard_install_gnome_tray
+  linboard_ensure_gnome_media_keys
 }
 
 # Run after binary is installed to ~/.local/bin
@@ -292,7 +313,7 @@ linboard_post_install_setup() {
     if "$bin_dir/linboard" install-shortcut; then
       linboard_log "Super+V shortcut registered"
     else
-      linboard_warn "Shortcut setup failed — run: linboard install-shortcut"
+      linboard_warn "Shortcut setup failed — run: linboard doctor"
     fi
   else
     linboard_warn "No display — run 'linboard install-shortcut' after login"
