@@ -4,6 +4,7 @@
 
 ## Features
 
+
 - **Clipboard history** — Automatically saves text, URLs, and images
 - **Global hotkey** — `Ctrl+Shift+V` opens history (like Win+V)
 - **Search** — Filter history instantly

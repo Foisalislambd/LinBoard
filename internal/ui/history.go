@@ -86,12 +86,13 @@ func (h *HistoryWindow) build() {
 			}
 			clip := h.clips[id]
 			h.mu.Unlock()
+			// NewBorder order: center, left, right (see fyne container.NewBorder)
 			border := obj.(*fyne.Container)
-			left := border.Objects[0].(*fyne.Container)
+			preview := border.Objects[0].(*widget.Label)
+			left := border.Objects[1].(*fyne.Container)
+			timeLabel := border.Objects[2].(*widget.Label)
 			pinIcon := left.Objects[0].(*widget.Icon)
 			typeBadge := left.Objects[1].(*widget.Label)
-			timeLabel := border.Objects[1].(*widget.Label)
-			preview := border.Objects[2].(*widget.Label)
 
 			if clip.Pinned {
 				pinIcon.SetResource(theme.MediaRecordIcon())
