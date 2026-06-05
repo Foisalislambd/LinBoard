@@ -160,8 +160,11 @@ linboard_ensure_path() {
     fi
   done
 
-  if [[ "$updated" -eq 0 ]] && [[ ! -f "$HOME/.bashrc" ]]; then
-    printf '%s\n' "$line" >> "$HOME/.profile"
+  if [[ "$updated" -eq 0 ]]; then
+    touch "$HOME/.profile"
+    if ! grep -qF "$bin_dir" "$HOME/.profile" 2>/dev/null; then
+      printf '\n# LinBoard\n%s\n' "$line" >> "$HOME/.profile"
+    fi
   fi
 
   export PATH="$bin_dir:$PATH"
@@ -191,8 +194,13 @@ linboard_start_app() {
   fi
 }
 
-# Run before downloading / installing LinBoard binary
+# Run before downloading / installing LinBoard binary (once per install run)
 linboard_preflight_setup() {
+  if [[ "${LINBOARD_PREFLIGHT_DONE:-}" == "1" ]]; then
+    return 0
+  fi
+  export LINBOARD_PREFLIGHT_DONE=1
+
   linboard_detect_os
   linboard_detect_session
 
@@ -212,10 +220,14 @@ linboard_post_install_setup() {
 
   linboard_ensure_path "$bin_dir"
 
-  if "$bin_dir/linboard" install-shortcut 2>/dev/null; then
-    linboard_log "Super+V shortcut registered"
+  if [[ -n "${DISPLAY:-}" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    if "$bin_dir/linboard" install-shortcut; then
+      linboard_log "Super+V shortcut registered"
+    else
+      linboard_warn "Shortcut setup failed — run: linboard install-shortcut"
+    fi
   else
-    linboard_warn "Shortcut setup failed — run: linboard install-shortcut"
+    linboard_warn "No display — run 'linboard install-shortcut' after login"
   fi
 
   linboard_start_app "$bin_dir"

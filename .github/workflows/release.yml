@@ -162,20 +162,41 @@ jobs:
       - name: List packages
         run: find dist -type f | sort
 
+      - name: Generate release description
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          sed -e "s/@VERSION@/${VERSION}/g" -e "s/@TAG@/${TAG}/g" \
+            .github/release-notes.md > /tmp/release-body.md
+          echo "" >> /tmp/release-body.md
+          echo "---" >> /tmp/release-body.md
+          echo "" >> /tmp/release-body.md
+          echo "## What's changed" >> /tmp/release-body.md
+          PREV=$(git tag -l 'v*' --sort=-v:refname | grep -v "^${TAG}$" | head -1 || true)
+          if [ -n "$PREV" ]; then
+            echo "Compare: [\`${PREV}...${TAG}\`](https://github.com/${{ github.repository }}/compare/${PREV}...${TAG})" >> /tmp/release-body.md
+          fi
+          git log --oneline --pretty=format:'- %s (%h)' -20 >> /tmp/release-body.md
+
       - name: Create and push tag
         run: |
           TAG="${{ needs.version.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — reusing for release upload"
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}
-          name: Release ${{ needs.version.outputs.tag }}
-          generate_release_notes: true
+          name: LinBoard ${{ needs.version.outputs.tag }}
+          body_path: /tmp/release-body.md
           files: |
             dist/**/*.tar.gz
             dist/**/*.sha256
