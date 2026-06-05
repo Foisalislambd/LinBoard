@@ -26,6 +26,17 @@ make run
 3. Describe which desktop environment(s) you tested
 4. Open a PR with a clear summary
 
+## Releases
+
+Tagged pushes (`v*`) trigger `.github/workflows/release.yml`, which builds **linux/amd64** and **linux/arm64** packages and uploads them to GitHub Releases.
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Each tarball contains the binary, `install.sh`, desktop file, and `QUICKSTART.txt`.
+
 ## Reporting bugs
 
 Include:

@@ -1,0 +1,16 @@
+LinBoard — Quick Start
+======================
+
+1. Extract this folder
+2. Run: ./install.sh
+3. Start: linboard
+4. Press Super+V (Win key + V) to open clipboard history
+
+Commands:
+  linboard              Start (system tray)
+  linboard toggle       Show/hide history
+  linboard install-shortcut   Re-register Super+V
+
+Works on: GNOME, KDE Plasma, XFCE, Cinnamon, X11 and Wayland.
+
+Support: https://github.com/foisal/linboard

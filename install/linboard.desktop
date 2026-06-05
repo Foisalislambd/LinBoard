@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=LinBoard
+GenericName=Clipboard Manager
+Comment=Windows-style clipboard history for Linux (Super+V)
+Exec=@EXEC@
+Icon=clipboard
+Terminal=false
+Categories=Utility;System;
+Keywords=clipboard;history;paste;
+StartupNotify=false

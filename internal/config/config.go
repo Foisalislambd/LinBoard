@@ -8,9 +8,11 @@ import (
 
 const (
 	AppName     = "LinBoard"
-	AppVersion  = "1.0.0"
 	HotkeyLabel = "Super+V"
 )
+
+// AppVersion is set at build time via -ldflags (defaults to "dev").
+var AppVersion = "dev"
 
 type Config struct {
 	MaxHistory     int    `json:"max_history"`
