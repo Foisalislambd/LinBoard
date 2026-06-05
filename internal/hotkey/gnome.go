@@ -8,6 +8,11 @@ import (
 	"github.com/foisal/linboard/internal/platform"
 )
 
+const (
+	gnomeShellKeybindings = "org.gnome.shell.keybindings"
+	gnomeMessageTrayKey   = "toggle-message-tray"
+)
+
 const gnomeBindingName = "custom-linboard"
 
 // gnomeBackend registers Super+V via GNOME Settings (gsettings).
@@ -15,6 +20,9 @@ const gnomeBindingName = "custom-linboard"
 type gnomeBackend struct{}
 
 func (b *gnomeBackend) start(_ func()) error {
+	if err := releaseGNOMESuperVConflict(); err != nil {
+		log.Printf("hotkey: GNOME Super+V conflict: %v", err)
+	}
 	if gnomeHotkeyConfigured() {
 		log.Printf("hotkey using GNOME shortcut: %s → linboard toggle", config.HotkeyLabel)
 		return nil
@@ -82,5 +90,34 @@ func setupGNOMEHotkey(exe string) error {
 	if err := gsettingsSet(schema, "command", exe+" toggle"); err != nil {
 		return err
 	}
-	return gsettingsSet(schema, "binding", "<Super>v")
+	if err := gsettingsSet(schema, "binding", "<Super>v"); err != nil {
+		return err
+	}
+	return releaseGNOMESuperVConflict()
+}
+
+// releaseGNOMESuperVConflict removes Super+V from GNOME Shell's message tray binding.
+// Shell keybindings take priority over custom media-keys shortcuts.
+func releaseGNOMESuperVConflict() error {
+	bindings, err := gsettingsGetArray(gnomeShellKeybindings, gnomeMessageTrayKey)
+	if err != nil {
+		return nil
+	}
+	var kept []string
+	removed := false
+	for _, b := range bindings {
+		if strings.EqualFold(b, "<Super>v") {
+			removed = true
+			continue
+		}
+		kept = append(kept, b)
+	}
+	if !removed {
+		return nil
+	}
+	if err := gsettingsSetArray(gnomeShellKeybindings, gnomeMessageTrayKey, kept); err != nil {
+		return err
+	}
+	log.Printf("hotkey: released %s from GNOME message tray (now free for LinBoard)", config.HotkeyLabel)
+	return nil
 }
