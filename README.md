@@ -279,6 +279,28 @@ rm -rf ~/.config/linboard
 
 Remove the **Super+V** shortcut manually in your desktop’s keyboard settings (search for **LinBoard**).
 
+## Publish a release (maintainers)
+
+**CI and Release are different workflows:**
+
+| Workflow | When it runs | What it does |
+|----------|--------------|--------------|
+| **CI** (`ci.yml`) | Every push to `main` | Build + vet only |
+| **Release** (`release.yml`) | Only when you **push a version tag** | Build amd64 + arm64 → GitHub Release |
+
+Pushing code to `main` does **not** create a release. You must create and push a tag:
+
+```bash
+git push origin main          # optional: push latest commits first
+
+git tag v1.0.0                # version tag (must start with v)
+git push origin v1.0.0        # this triggers Release workflow
+```
+
+Check progress: [Actions → Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
+
+When finished, packages appear at [Releases](https://github.com/Foisalislambd/LinBoard/releases).
+
 ## Commands
 
 | Command | Description |
