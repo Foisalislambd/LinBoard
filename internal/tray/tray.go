@@ -41,7 +41,7 @@ func (t *Tray) Run(onReady func()) {
 func (t *Tray) setup() {
 	systray.SetIcon(assets.TrayPNG())
 	systray.SetTitle("LinBoard")
-	systray.SetTooltip("LinBoard — Clipboard Manager (" + config.HotkeyLabel + ")")
+	systray.SetTooltip(config.AppName)
 
 	mShow := systray.AddMenuItem(
 		"Show History ("+config.HotkeyLabel+")",

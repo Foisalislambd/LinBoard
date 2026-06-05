@@ -93,7 +93,7 @@ func (b *portalBackend) bindShortcuts(session dbus.ObjectPath) error {
 		[]interface{}{
 			shortcutID,
 			map[string]dbus.Variant{
-				"description":       dbus.MakeVariant("LinBoard — Show clipboard history"),
+				"description":       dbus.MakeVariant(config.AppName),
 				"preferred_trigger": dbus.MakeVariant("LOGO+V"),
 			},
 		},

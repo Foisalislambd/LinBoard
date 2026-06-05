@@ -125,6 +125,23 @@ func WriteImage(data []byte) error {
 	return nil
 }
 
+// CopyClip puts clip content on the system clipboard without pasting.
+func CopyClip(clip *store.Clip) error {
+	watchSuppress.Add(1)
+	defer watchSuppress.Add(-1)
+
+	switch clip.ContentType {
+	case store.TypeImage:
+		data, err := os.ReadFile(clip.ImagePath)
+		if err != nil {
+			return err
+		}
+		return WriteImage(data)
+	default:
+		return WriteText(clip.Content)
+	}
+}
+
 // PasteClip copies content to clipboard and simulates Ctrl+V in the previously focused window.
 func PasteClip(clip *store.Clip) error {
 	watchSuppress.Add(1)

@@ -45,7 +45,7 @@ func NewHistoryWindow(app fyne.App, s *store.Store, cfg *config.Config) *History
 }
 
 func (h *HistoryWindow) build() {
-	h.win = h.app.NewWindow("LinBoard — Clipboard History")
+	h.win = h.app.NewWindow(config.AppName)
 	h.win.SetIcon(assets.Fyne())
 	h.win.SetFixedSize(true)
 	h.win.Resize(fyne.NewSize(480, 420))
@@ -69,6 +69,8 @@ func (h *HistoryWindow) build() {
 			pinIcon := widget.NewIcon(theme.MediaRecordIcon())
 			preview := widget.NewLabel("")
 			preview.Wrapping = fyne.TextTruncate
+			copyBtn := widget.NewButtonWithIcon("", theme.ContentCopyIcon(), nil)
+			copyBtn.Importance = widget.LowImportance
 			timeLabel := widget.NewLabel("")
 			timeLabel.TextStyle = fyne.TextStyle{Italic: true}
 			typeBadge := widget.NewLabel("")
@@ -76,7 +78,7 @@ func (h *HistoryWindow) build() {
 			return container.NewBorder(
 				nil, nil,
 				container.NewHBox(pinIcon, typeBadge),
-				timeLabel,
+				container.NewHBox(copyBtn, timeLabel),
 				preview,
 			)
 		},
@@ -92,7 +94,9 @@ func (h *HistoryWindow) build() {
 			border := obj.(*fyne.Container)
 			preview := border.Objects[0].(*widget.Label)
 			left := border.Objects[1].(*fyne.Container)
-			timeLabel := border.Objects[2].(*widget.Label)
+			right := border.Objects[2].(*fyne.Container)
+			copyBtn := right.Objects[0].(*widget.Button)
+			timeLabel := right.Objects[1].(*widget.Label)
 			pinIcon := left.Objects[0].(*widget.Icon)
 			typeBadge := left.Objects[1].(*widget.Label)
 
@@ -114,6 +118,10 @@ func (h *HistoryWindow) build() {
 
 			preview.SetText(clip.Preview)
 			timeLabel.SetText(store.FormatTime(clip.CreatedAt))
+			c := clip
+			copyBtn.OnTapped = func() {
+				_ = clipboard.CopyClip(&c)
+			}
 		},
 	)
 
@@ -128,11 +136,8 @@ func (h *HistoryWindow) build() {
 	help.TextStyle = fyne.TextStyle{Italic: true}
 	help.Alignment = fyne.TextAlignCenter
 
-	header := widget.NewLabelWithStyle("Clipboard History", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-
 	content := container.NewBorder(
 		container.NewVBox(
-			header,
 			h.search,
 			widget.NewSeparator(),
 		),
