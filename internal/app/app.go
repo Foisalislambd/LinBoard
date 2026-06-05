@@ -60,12 +60,14 @@ func New() (*App, error) {
 	a.fyneApp = fyneapp.NewWithID("com.linboard.app")
 	a.fyneApp.SetIcon(assets.Fyne())
 	clipboard.SetFyneWriter(func(text string) {
-		fyne.DoAndWait(func() {
+		// UI handlers (copy button) run on main — must not use DoAndWait there.
+		a.fyneApp.Driver().DoFromGoroutine(func() {
 			a.fyneApp.Clipboard().SetContent(text)
-		})
+		}, false)
 	})
 	clipboard.SetFyneReader(func() string {
 		var text string
+		// Monitor polls from a background goroutine — must block until read completes.
 		fyne.DoAndWait(func() {
 			text = a.fyneApp.Clipboard().Content()
 		})
