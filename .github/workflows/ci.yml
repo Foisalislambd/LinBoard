@@ -1,8 +1,7 @@
 name: CI
 
+# Runs on pull requests only — pushes to main are handled by release.yml
 on:
-  push:
-    branches: [main, master]
   pull_request:
     branches: [main, master]
 
@@ -24,8 +23,10 @@ jobs:
             libgl1-mesa-dev libxxf86vm-dev libayatana-appindicator3-dev \
             libdbus-1-dev
 
-      - name: Build
+      - name: Build and verify
         run: |
           go mod tidy
           go vet ./...
-          go build -o linboard ./cmd/linboard
+          go build -tags headless -ldflags "-s -w" -o linboard ./cmd/linboard
+          ./linboard version
+          ./linboard help | head -1

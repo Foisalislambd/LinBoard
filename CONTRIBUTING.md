@@ -26,15 +26,22 @@ make run
 3. Describe which desktop environment(s) you tested
 4. Open a PR with a clear summary
 
-## Releases
+## CI & releases
 
-Pushing to `main` triggers `.github/workflows/release.yml`, which auto-bumps the patch version, creates a git tag, builds **linux/amd64** and **linux/arm64** packages, and publishes a GitHub Release.
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull requests | Build + vet (`-tags headless`) |
+| `release.yml` | Push to `main` | Build packages → tag → GitHub Release |
+
+Pushing to `main` auto-bumps the patch version and publishes a release **after** a successful build (tag is created last).
+
+Skip release: include `[skip release]` in the commit message.
+
+Local headless build (no display needed for `version` / `help`):
 
 ```bash
-git push origin main
+go build -tags headless -o linboard ./cmd/linboard
 ```
-
-Skip release for a commit: include `[skip release]` in the commit message.
 
 Each tarball contains the binary, `install.sh`, desktop file, and `QUICKSTART.txt`.
 

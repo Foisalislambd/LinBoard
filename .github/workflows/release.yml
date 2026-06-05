@@ -1,7 +1,7 @@
 name: Release
 
-# Auto-release on every push to main: bumps patch version, creates tag, builds packages.
-# Skip with commit message containing [skip release]
+# Auto-release on push to main: version bump → build → tag → GitHub Release
+# Skip with [skip release] in the commit message
 on:
   push:
     branches: [main]
@@ -19,7 +19,7 @@ env:
 
 jobs:
   version:
-    name: Auto version & tag
+    name: Plan version
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Bump version and create tag
+      - name: Compute next version
         id: version
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
@@ -41,7 +41,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "tag=" >> "$GITHUB_OUTPUT"
             echo "version=" >> "$GITHUB_OUTPUT"
-            echo "Skipped — commit message contains [skip release]"
+            echo "Skipped — [skip release] in commit message"
             exit 0
           fi
 
@@ -66,15 +66,10 @@ jobs:
             TAG="v${MAJOR}.${MINOR}.${PATCH}"
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "Created and pushed $TAG"
+          echo "Next release: $TAG"
 
   build:
     name: Build ${{ matrix.name }}
@@ -97,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version.outputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - uses: actions/setup-go@v5
@@ -124,7 +119,8 @@ jobs:
           go vet ./...
           LDFLAGS="-s -w -X github.com/foisal/linboard/internal/config.AppVersion=${VERSION}"
           go build -ldflags "$LDFLAGS" -o linboard ./cmd/linboard
-          ./linboard version
+          file linboard
+          ls -lh linboard
 
       - name: Package release archive
         run: |
@@ -147,11 +143,15 @@ jobs:
           path: dist/${{ matrix.asset }}-v${{ needs.version.outputs.version }}.tar.gz*
 
   release:
-    name: Publish GitHub Release
+    name: Tag & publish release
     needs: [version, build]
     if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -160,7 +160,15 @@ jobs:
       - name: List packages
         run: find dist -type f | sort
 
-      - name: Create GitHub Release
+      - name: Create and push tag
+        run: |
+          TAG="${{ needs.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}

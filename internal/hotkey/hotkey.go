@@ -68,7 +68,7 @@ func (m *Manager) Start() error {
 
 	// 4) X11 low-level grab
 	if !platform.UsePortalHotkey() {
-		m.backend = &x11Backend{}
+		m.backend = newX11Backend()
 		if err := m.backend.start(m.onPress); err != nil {
 			return err
 		}

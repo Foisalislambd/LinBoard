@@ -1,3 +1,5 @@
+//go:build !headless
+
 package hotkey
 
 import (
@@ -11,6 +13,10 @@ import (
 type x11Backend struct {
 	hk      *hotkey.Hotkey
 	onPress func()
+}
+
+func newX11Backend() backend {
+	return &x11Backend{}
 }
 
 func (b *x11Backend) start(onPress func()) error {
