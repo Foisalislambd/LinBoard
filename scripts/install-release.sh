@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
-# LinBoard — one-line installer from GitHub Releases
-# Usage:
+# LinBoard — one-line installer (fully automatic)
 #   curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-#   LINBOARD_VERSION=v1.0.0 curl -fsSL ... | bash
 set -euo pipefail
 
 REPO="${LINBOARD_REPO:-Foisalislambd/LinBoard}"
+BRANCH="${LINBOARD_BRANCH:-main}"
 VERSION="${LINBOARD_VERSION:-latest}"
 BIN_DIR="${LINBOARD_BIN_DIR:-$HOME/.local/bin}"
+RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Load system setup helpers
+curl -fsSL "$RAW_BASE/scripts/lib/system-setup.sh" -o "$TMP/system-setup.sh"
+# shellcheck source=/dev/null
+source "$TMP/system-setup.sh"
+
+linboard_preflight_setup
 
 arch="$(uname -m)"
 case "$arch" in
@@ -31,7 +41,7 @@ else
 fi
 
 if [ -z "$VERSION_TAG" ]; then
-  echo "Could not resolve release version from GitHub."
+  echo "No release found on GitHub yet. Try again after the first release is published."
   exit 1
 fi
 
@@ -39,16 +49,15 @@ VER="${VERSION_TAG#v}"
 TARBALL="${ASSET}-v${VER}.tar.gz"
 URL="https://github.com/${REPO}/releases/download/${VERSION_TAG}/${TARBALL}"
 
-echo "==> LinBoard ${VERSION_TAG} (${ASSET})"
-echo "==> Downloading $URL"
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+linboard_log "LinBoard ${VERSION_TAG} (${ASSET})"
+linboard_log "Downloading..."
 
 curl -fsSL "$URL" -o "$TMP/$TARBALL"
 tar -xzf "$TMP/$TARBALL" -C "$TMP"
 
+# Bundle system-setup for install.sh
+mkdir -p "$TMP/lib"
+cp "$TMP/system-setup.sh" "$TMP/lib/system-setup.sh"
+
 export LINBOARD_BIN_DIR="$BIN_DIR"
 bash "$TMP/install.sh"
-
-echo "==> Done."

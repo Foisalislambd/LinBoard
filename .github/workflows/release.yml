@@ -130,6 +130,8 @@ jobs:
           mkdir -p "$PKG"
           cp linboard "$PKG/"
           cp scripts/package/install.sh "$PKG/install.sh"
+          mkdir -p "$PKG/lib"
+          cp scripts/lib/system-setup.sh "$PKG/lib/system-setup.sh"
           cp install/linboard.desktop "$PKG/linboard.desktop"
           cp scripts/package/QUICKSTART.txt "$PKG/QUICKSTART.txt"
           chmod +x "$PKG/install.sh" "$PKG/linboard"

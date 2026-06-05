@@ -1,22 +1,35 @@
 #!/usr/bin/env bash
-# LinBoard — install from release package (no Go required)
+# LinBoard — install from release package (fully automatic)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="${LINBOARD_BIN_DIR:-$HOME/.local/bin}"
+
+linboard_log() { echo "==> $*"; }
 DESKTOP_DIR="$HOME/.local/share/applications"
 AUTOSTART_DIR="$HOME/.config/autostart"
 
-echo "==> Installing LinBoard..."
+# shellcheck source=../lib/system-setup.sh
+if [[ -f "$ROOT/lib/system-setup.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/lib/system-setup.sh"
+elif [[ -f "$ROOT/../lib/system-setup.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/../lib/system-setup.sh"
+fi
+
+linboard_log "Installing LinBoard..."
 mkdir -p "$BIN_DIR" "$DESKTOP_DIR" "$AUTOSTART_DIR"
+
+if declare -F linboard_preflight_setup >/dev/null 2>&1; then
+  linboard_preflight_setup
+fi
 
 install -m 755 "$ROOT/linboard" "$BIN_DIR/linboard"
 
-# Desktop launcher
 sed "s|@EXEC@|$BIN_DIR/linboard|g" "$ROOT/linboard.desktop" > "$DESKTOP_DIR/linboard.desktop"
 chmod 644 "$DESKTOP_DIR/linboard.desktop"
 
-# Autostart
 cat > "$AUTOSTART_DIR/linboard.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -28,30 +41,9 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 EOF
 
-# Runtime tools (optional but recommended)
-MISSING=()
-for cmd in wtype xdotool; do
-  command -v "$cmd" >/dev/null 2>&1 || MISSING+=("$cmd")
-done
-if ((${#MISSING[@]} > 0)); then
-  echo "==> Note: install for auto-paste support:"
-  echo "    Debian/Ubuntu: sudo apt install ${MISSING[*]}"
-  echo "    Fedora:        sudo dnf install ${MISSING[*]}"
-  echo "    Arch:          sudo pacman -S ${MISSING[*]}"
-fi
-
-# Super+V shortcut (GNOME/KDE/XFCE/Cinnamon)
-if "$BIN_DIR/linboard" install-shortcut; then
-  echo "==> Super+V shortcut registered"
+if declare -F linboard_post_install_setup >/dev/null 2>&1; then
+  linboard_post_install_setup "$BIN_DIR"
 else
-  echo "==> Shortcut: add manually in Settings → Keyboard"
-  echo "    Command: $BIN_DIR/linboard toggle"
-fi
-
-echo ""
-echo "Installed: $BIN_DIR/linboard"
-echo "Start now: linboard"
-echo "Hotkey:    Super+V (Win+V)"
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-  echo "Add to PATH: export PATH=\"$BIN_DIR:\$PATH\""
+  "$BIN_DIR/linboard" install-shortcut || true
+  echo "Installed: $BIN_DIR/linboard — press Super+V"
 fi

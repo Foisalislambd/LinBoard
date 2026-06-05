@@ -1,10 +1,9 @@
 LinBoard — Quick Start
 ======================
 
-1. Extract this folder
-2. Run: ./install.sh
-3. Start: linboard
-4. Press Super+V (Win key + V) to open clipboard history
+1. Run: ./install.sh
+   (installs everything automatically — deps, shortcut, autostart)
+2. Press Super+V (Win key + V) to open clipboard history
 
 Commands:
   linboard              Start (system tray)

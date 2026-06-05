@@ -17,10 +17,14 @@ Copy and paste this in your terminal:
 curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 ```
 
-That's it. The script downloads the latest version, installs LinBoard, sets up autostart, and registers **Super+V**.
+That's it — fully automatic. The installer will:
 
-> **Need auto-paste?** Install `wtype` (Wayland) or `xdotool` (X11) first:
-> `sudo apt install wtype xdotool`
+- Detect your Linux distro and CPU
+- Install dependencies (`wtype`, `xdotool`, GNOME tray support) — may ask for your password once
+- Install LinBoard, autostart, and **Super+V** shortcut
+- Add `~/.local/bin` to your PATH and start LinBoard
+
+No manual setup needed.
 
 ---
 
