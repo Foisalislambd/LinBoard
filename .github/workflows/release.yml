@@ -1,19 +1,85 @@
 name: Release
 
+# Auto-release on every push to main: bumps patch version, creates tag, builds packages.
+# Skip with commit message containing [skip release]
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 env:
   GO_VERSION: '1.26.x'
 
 jobs:
+  version:
+    name: Auto version & tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      skip: ${{ steps.version.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version and create tag
+        id: version
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          if echo "$COMMIT_MSG" | grep -qi '\[skip release\]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "Skipped — commit message contains [skip release]"
+            exit 0
+          fi
+
+          if EXISTING=$(git describe --exact-match --tags HEAD 2>/dev/null); then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$EXISTING" >> "$GITHUB_OUTPUT"
+            echo "version=${EXISTING#v}" >> "$GITHUB_OUTPUT"
+            echo "Commit already tagged as $EXISTING — skipping"
+            exit 0
+          fi
+
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            TAG="v1.0.0"
+          else
+            VER="${LATEST#v}"
+            MAJOR="${VER%%.*}"
+            REST="${VER#*.}"
+            MINOR="${REST%%.*}"
+            PATCH="${REST##*.}"
+            PATCH=$((PATCH + 1))
+            TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Created and pushed $TAG"
+
   build:
     name: Build ${{ matrix.name }}
+    needs: version
+    if: needs.version.outputs.skip != 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -30,6 +96,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+          fetch-depth: 1
 
       - uses: actions/setup-go@v5
         with:
@@ -43,28 +112,23 @@ jobs:
             libgl1-mesa-dev libxxf86vm-dev libayatana-appindicator3-dev \
             libdbus-1-dev
 
-      - name: Resolve version
-        id: version
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Building version $TAG for ${{ matrix.name }}"
-
       - name: Build binary
         env:
           CGO_ENABLED: '1'
           GOOS: linux
           GOARCH: ${{ matrix.goarch }}
         run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          echo "Building version $VERSION for ${{ matrix.name }}"
           go mod tidy
           go vet ./...
-          LDFLAGS="-s -w -X github.com/foisal/linboard/internal/config.AppVersion=${{ steps.version.outputs.tag }}"
+          LDFLAGS="-s -w -X github.com/foisal/linboard/internal/config.AppVersion=${VERSION}"
           go build -ldflags "$LDFLAGS" -o linboard ./cmd/linboard
           ./linboard version
 
       - name: Package release archive
         run: |
-          VERSION="${{ steps.version.outputs.tag }}"
+          VERSION="${{ needs.version.outputs.version }}"
           ASSET="${{ matrix.asset }}"
           PKG="dist/${ASSET}"
           mkdir -p "$PKG"
@@ -80,11 +144,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}-v${{ steps.version.outputs.tag }}.tar.gz*
+          path: dist/${{ matrix.asset }}-v${{ needs.version.outputs.version }}.tar.gz*
 
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [version, build]
+    if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -98,6 +163,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Release ${{ needs.version.outputs.tag }}
           generate_release_notes: true
           files: |
             dist/**/*.tar.gz

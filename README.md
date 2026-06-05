@@ -279,27 +279,31 @@ rm -rf ~/.config/linboard
 
 Remove the **Super+V** shortcut manually in your desktop’s keyboard settings (search for **LinBoard**).
 
-## Publish a release (maintainers)
+## Auto release (maintainers)
 
-**CI and Release are different workflows:**
+Every **`git push origin main`** automatically:
+
+1. Bumps the patch version (`v1.0.0` → `v1.0.1` → `v1.0.2` …)
+2. Creates a Git tag on GitHub
+3. Builds **linux-amd64** + **linux-arm64** packages
+4. Publishes a [GitHub Release](https://github.com/Foisalislambd/LinBoard/releases)
+
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main   # that's it — release runs automatically
+```
 
 | Workflow | When it runs | What it does |
 |----------|--------------|--------------|
-| **CI** (`ci.yml`) | Every push to `main` | Build + vet only |
-| **Release** (`release.yml`) | Only when you **push a version tag** | Build amd64 + arm64 → GitHub Release |
+| **CI** (`ci.yml`) | Push / PR to `main` | Quick build + vet |
+| **Release** (`release.yml`) | Push to `main` | Auto tag + version + release packages |
 
-Pushing code to `main` does **not** create a release. You must create and push a tag:
+**Skip a release** (docs-only commit): add `[skip release]` to the commit message.
 
-```bash
-git push origin main          # optional: push latest commits first
+**Manual tag** (optional): you can still `git tag v2.0.0 && git push origin v2.0.0` — the next auto-release continues from that version.
 
-git tag v1.0.0                # version tag (must start with v)
-git push origin v1.0.0        # this triggers Release workflow
-```
-
-Check progress: [Actions → Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
-
-When finished, packages appear at [Releases](https://github.com/Foisalislambd/LinBoard/releases).
+Progress: [Actions → Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
 
 ## Commands
 

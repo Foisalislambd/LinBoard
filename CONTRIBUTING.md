@@ -28,12 +28,13 @@ make run
 
 ## Releases
 
-Tagged pushes (`v*`) trigger `.github/workflows/release.yml`, which builds **linux/amd64** and **linux/arm64** packages and uploads them to GitHub Releases.
+Pushing to `main` triggers `.github/workflows/release.yml`, which auto-bumps the patch version, creates a git tag, builds **linux/amd64** and **linux/arm64** packages, and publishes a GitHub Release.
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git push origin main
 ```
+
+Skip release for a commit: include `[skip release]` in the commit message.
 
 Each tarball contains the binary, `install.sh`, desktop file, and `QUICKSTART.txt`.
 
