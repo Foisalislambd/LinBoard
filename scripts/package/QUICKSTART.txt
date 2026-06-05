@@ -13,4 +13,4 @@ Commands:
 
 Works on: GNOME, KDE Plasma, XFCE, Cinnamon, X11 and Wayland.
 
-Support: https://github.com/foisal/linboard
+Support: https://github.com/Foisalislambd/LinBoard

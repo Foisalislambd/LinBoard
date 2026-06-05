@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # LinBoard — one-line installer from GitHub Releases
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/install-release.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 #   LINBOARD_VERSION=v1.0.0 curl -fsSL ... | bash
 set -euo pipefail
 
-REPO="${LINBOARD_REPO:-foisal/linboard}"
+REPO="${LINBOARD_REPO:-Foisalislambd/LinBoard}"
 VERSION="${LINBOARD_VERSION:-latest}"
 INSTALL_DIR="${LINBOARD_INSTALL_DIR:-$HOME/.local/linboard}"
 BIN_DIR="${LINBOARD_BIN_DIR:-$HOME/.local/bin}"

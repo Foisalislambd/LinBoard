@@ -5,8 +5,8 @@ Thank you for helping make LinBoard work great on every Linux desktop!
 ## Development setup
 
 ```bash
-git clone https://github.com/your-org/linboard.git
-cd linboard
+git clone https://github.com/Foisalislambd/LinBoard.git
+cd LinBoard
 ./scripts/setup.sh   # Debian/Ubuntu deps + build
 make run
 ```

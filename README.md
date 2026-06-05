@@ -1,10 +1,12 @@
 # LinBoard
 
-[![CI](https://github.com/foisal/linboard/actions/workflows/ci.yml/badge.svg)](https://github.com/foisal/linboard/actions/workflows/ci.yml)
-[![Release](https://github.com/foisal/linboard/actions/workflows/release.yml/badge.svg)](https://github.com/foisal/linboard/actions/workflows/release.yml)
+[![CI](https://github.com/Foisalislambd/LinBoard/actions/workflows/ci.yml/badge.svg)](https://github.com/Foisalislambd/LinBoard/actions/workflows/ci.yml)
+[![Release](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml/badge.svg)](https://github.com/Foisalislambd/LinBoard/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **LinBoard** is an open-source clipboard manager for Linux — Windows **Win+V** style history, built with Go.
+
+**Repository:** [github.com/Foisalislambd/LinBoard](https://github.com/Foisalislambd/LinBoard)
 
 Works on **GNOME, KDE Plasma, XFCE, Cinnamon**, **X11 and Wayland**.
 
@@ -21,7 +23,7 @@ Works on **GNOME, KDE Plasma, XFCE, Cinnamon**, **X11 and Wayland**.
 
 ## Installation guide
 
-LinBoard supports **Linux x86_64 (amd64)** and **ARM64 (aarch64)**. You do **not** need Go installed if you use a [release package](https://github.com/foisal/linboard/releases).
+LinBoard supports **Linux x86_64 (amd64)** and **ARM64 (aarch64)**. You do **not** need Go installed if you use a [release package](https://github.com/Foisalislambd/LinBoard/releases).
 
 ### Before you install
 
@@ -61,19 +63,19 @@ sudo pacman -S wtype xdotool
 Downloads the latest release, installs to `~/.local/bin`, sets autostart, and registers **Super+V**.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/install-release.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 ```
 
-Install a **specific version** (replace `v1.0.0` with the tag from [Releases](https://github.com/foisal/linboard/releases)):
+Install a **specific version** (replace `v1.0.0` with the tag from [Releases](https://github.com/Foisalislambd/LinBoard/releases)):
 
 ```bash
-LINBOARD_VERSION=v1.0.0 curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/install-release.sh | bash
+LINBOARD_VERSION=v1.0.0 curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 ```
 
 **Custom install location:**
 
 ```bash
-LINBOARD_BIN_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/install-release.sh | bash
+LINBOARD_BIN_DIR="$HOME/bin" curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 ```
 
 Then continue to [After install](#after-install).
@@ -82,7 +84,7 @@ Then continue to [After install](#after-install).
 
 ### Method 2 — Manual download (offline / no curl pipe)
 
-**Step 1 — Pick the right file** from [GitHub Releases](https://github.com/foisal/linboard/releases):
+**Step 1 — Pick the right file** from [GitHub Releases](https://github.com/Foisalislambd/LinBoard/releases):
 
 | Download | Your system |
 |----------|-------------|
@@ -119,8 +121,8 @@ For developers or distros without a pre-built package. Requires **Go 1.26+**, **
 #### Debian / Ubuntu / Mint
 
 ```bash
-git clone https://github.com/foisal/linboard.git
-cd linboard
+git clone https://github.com/Foisalislambd/LinBoard.git
+cd LinBoard
 ./scripts/setup.sh
 ```
 
@@ -139,8 +141,8 @@ sudo dnf install gcc pkg-config libX11-devel libXcursor-devel libXrandr-devel \
   libXinerama-devel libXi-devel mesa-libGL-devel libXxf86vm-devel \
   libayatana-appindicator3-devel dbus-devel wtype xdotool
 
-git clone https://github.com/foisal/linboard.git
-cd linboard
+git clone https://github.com/Foisalislambd/LinBoard.git
+cd LinBoard
 go mod tidy
 go build -o linboard ./cmd/linboard
 ./linboard install
@@ -152,8 +154,8 @@ go build -o linboard ./cmd/linboard
 sudo pacman -S gcc pkgconf libx11 libxcursor libxrandr libxinerama libxi \
   mesa libxxf86vm libayatana-appindicator3 dbus wtype xdotool go
 
-git clone https://github.com/foisal/linboard.git
-cd linboard
+git clone https://github.com/Foisalislambd/LinBoard.git
+cd LinBoard
 go mod tidy
 go build -o linboard ./cmd/linboard
 ./linboard install
@@ -238,7 +240,7 @@ linboard version
 **One-line (latest release):**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/install-release.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
 ```
 
 **Manual:** download the new `.tar.gz`, extract, run `./install.sh` again (overwrites the binary).
@@ -246,7 +248,7 @@ curl -fsSL https://raw.githubusercontent.com/foisal/linboard/main/scripts/instal
 **From source:**
 
 ```bash
-cd linboard
+cd LinBoard
 git pull
 make rebuild
 ./linboard install
