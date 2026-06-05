@@ -76,3 +76,12 @@ func hasBin(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }
+
+func containsPath(paths []string, want string) bool {
+	for _, p := range paths {
+		if p == want {
+			return true
+		}
+	}
+	return false
+}

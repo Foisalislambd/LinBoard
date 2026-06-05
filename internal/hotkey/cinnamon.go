@@ -3,7 +3,6 @@ package hotkey
 import (
 	"fmt"
 	"log"
-	"os/exec"
 
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/platform"
@@ -37,9 +36,8 @@ func setupCinnamonHotkey(exe string) error {
 	path := "/org/cinnamon/desktop/keybindings/custom-keybindings/custom-linboard/"
 	fullSchema := listSchema + ".custom-keybinding:" + path
 
-	// Cinnamon uses custom-keybindings (same idea as GNOME).
 	paths, err := gsettingsGetArray(listSchema, "custom-keybindings")
-	if err != nil {
+	if err != nil || len(paths) == 0 {
 		paths, err = gsettingsGetArray(listSchema, "custom-list")
 		if err != nil {
 			return err
@@ -61,44 +59,4 @@ func setupCinnamonHotkey(exe string) error {
 		return err
 	}
 	return gsettingsSet(fullSchema, "binding", "<Super>v")
-}
-
-func gsettingsGetArray(schema, key string) ([]string, error) {
-	out, err := execOutput("gsettings", "get", schema, key)
-	if err != nil {
-		return nil, err
-	}
-	return parseGSettingsStringArray(out), nil
-}
-
-func gsettingsSetArray(schema, key string, paths []string) error {
-	if len(paths) == 0 {
-		return run("gsettings", "set", schema, key, "[]")
-	}
-	var quoted []string
-	for _, p := range paths {
-		quoted = append(quoted, "'"+p+"'")
-	}
-	val := "[" + stringsJoin(quoted, ", ") + "]"
-	return run("gsettings", "set", schema, key, val)
-}
-
-func stringsJoin(parts []string, sep string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-	s := parts[0]
-	for _, p := range parts[1:] {
-		s += sep + p
-	}
-	return s
-}
-
-func execOutput(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", name, err)
-	}
-	return string(out), nil
 }

@@ -1,20 +1,16 @@
 package hotkey
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log"
-	"os/exec"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/foisal/linboard/internal/config"
+	"github.com/godbus/dbus/v5"
 )
 
 const (
@@ -25,34 +21,36 @@ const (
 	shortcutID       = "linboard_toggle"
 )
 
-var (
-	objectPathRE  = regexp.MustCompile(`objectpath\s+(?:'([^']+)'|(/[^\s;]+))`)
-	signalPathRE  = regexp.MustCompile(`\bpath=([^;\s]+)`)
-)
-
 type portalBackend struct {
+	conn     *dbus.Conn
 	onPress  func()
 	stopCh   chan struct{}
 	stopOnce sync.Once
-	monitor  *exec.Cmd
+	sigCh    chan *dbus.Signal
 }
 
 func (b *portalBackend) start(onPress func()) error {
-	if !hasBin("gdbus") {
-		return fmt.Errorf("gdbus not found (install libglib2.0-bin)")
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return fmt.Errorf("session bus: %w", err)
 	}
-	if !hasBin("dbus-monitor") {
-		return fmt.Errorf("dbus-monitor not found (install dbus-user-session)")
-	}
-
+	b.conn = conn
 	b.onPress = onPress
 	b.stopCh = make(chan struct{})
+	b.sigCh = make(chan *dbus.Signal, 8)
+	conn.Signal(b.sigCh)
 
-	if err := b.setup(); err != nil {
+	session, err := b.createSession()
+	if err != nil {
+		conn.Close()
 		return err
 	}
-
-	if err := b.startActivatedMonitor(); err != nil {
+	if err := b.bindShortcuts(session); err != nil {
+		conn.Close()
+		return err
+	}
+	if err := b.watchActivated(); err != nil {
+		conn.Close()
 		return err
 	}
 
@@ -60,217 +58,138 @@ func (b *portalBackend) start(onPress func()) error {
 	return nil
 }
 
-func (b *portalBackend) setup() error {
-	session, err := b.createSession()
-	if err != nil {
-		return err
+func (b *portalBackend) createSession() (dbus.ObjectPath, error) {
+	opts := map[string]dbus.Variant{
+		"handle_token":         dbus.MakeVariant(randomToken()),
+		"session_handle_token": dbus.MakeVariant("linboard"),
 	}
-	return b.bindShortcuts(session)
+	return b.portalRequest(portalIface+".CreateSession", 30*time.Second, opts)
 }
 
-func (b *portalBackend) createSession() (string, error) {
-	token := randomToken()
-	opts := fmt.Sprintf("{'handle_token': <'%s'>, 'session_handle_token': <'linboard'>}", token)
-
-	status, results, err := portalCall(30*time.Second, portalIface+".CreateSession", opts)
-	if err != nil {
-		return "", fmt.Errorf("CreateSession: %w", err)
+func (b *portalBackend) bindShortcuts(session dbus.ObjectPath) error {
+	// Portal expects a(sa{sv}): array of (shortcut_id, options).
+	shortcuts := []interface{}{
+		[]interface{}{
+			shortcutID,
+			map[string]dbus.Variant{
+				"description":       dbus.MakeVariant(config.AppName),
+				"preferred_trigger": dbus.MakeVariant("LOGO+V"),
+			},
+		},
 	}
-	if status != 0 {
-		return "", fmt.Errorf("CreateSession failed (status %d)", status)
+	opts := map[string]dbus.Variant{
+		"handle_token": dbus.MakeVariant(randomToken()),
 	}
-	session, ok := results["session_handle"]
-	if !ok || session == "" {
-		return "", fmt.Errorf("CreateSession: missing session_handle")
-	}
-	return session, nil
-}
-
-func (b *portalBackend) bindShortcuts(session string) error {
-	token := randomToken()
-	shortcuts := fmt.Sprintf(
-		"[('%s', {'description': <'%s'>, 'preferred_trigger': <'LOGO+V'>})]",
-		shortcutID, config.AppName,
-	)
-	opts := fmt.Sprintf("{'handle_token': <'%s'>}", token)
-
-	status, _, err := portalCall(
-		60*time.Second,
+	return b.portalVoid(
 		portalIface+".BindShortcuts",
-		fmt.Sprintf("objectpath '%s'", session),
-		shortcuts,
-		"''",
-		opts,
+		60*time.Second,
+		session, shortcuts, "", opts,
 	)
-	if err != nil {
-		return fmt.Errorf("BindShortcuts: %w", err)
-	}
-	if status != 0 {
-		return fmt.Errorf("BindShortcuts failed (status %d)", status)
-	}
-	return nil
 }
 
-// portalCall starts dbus-monitor before the gdbus call to avoid missing fast Response signals.
-func portalCall(timeout time.Duration, method string, args ...string) (uint32, map[string]string, error) {
+func (b *portalBackend) portalRequest(method string, timeout time.Duration, args ...interface{}) (dbus.ObjectPath, error) {
+	return b.portalCall(method, timeout, true, args...)
+}
+
+func (b *portalBackend) portalVoid(method string, timeout time.Duration, args ...interface{}) error {
+	_, err := b.portalCall(method, timeout, false, args...)
+	return err
+}
+
+func (b *portalBackend) portalCall(method string, timeout time.Duration, wantSession bool, args ...interface{}) (dbus.ObjectPath, error) {
+	obj := b.conn.Object(portalBusName, dbus.ObjectPath(portalObjectPath))
+	var request dbus.ObjectPath
+	if err := obj.Call(method, 0, args...).Store(&request); err != nil {
+		return "", err
+	}
+
+	status, results, err := waitPortalResponse(b.conn, b.sigCh, request, timeout)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", method, err)
+	}
+	if status != 0 {
+		return "", fmt.Errorf("%s failed (status %d)", method, status)
+	}
+	if !wantSession {
+		return "", nil
+	}
+	handle, ok := variantObjectPath(results["session_handle"])
+	if !ok {
+		return "", fmt.Errorf("%s: missing session_handle", method)
+	}
+	return handle, nil
+}
+
+func waitPortalResponse(conn *dbus.Conn, sigCh chan *dbus.Signal, request dbus.ObjectPath, timeout time.Duration) (uint32, map[string]dbus.Variant, error) {
+	rule := fmt.Sprintf("type='signal',path='%s',interface='%s',member='Response'", request, requestIface)
+	if err := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule).Err; err != nil {
+		return 2, nil, err
+	}
+	defer func() { _ = conn.BusObject().Call("org.freedesktop.DBus.RemoveMatch", 0, rule).Err }()
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	match := fmt.Sprintf("type='signal',interface='%s',member='Response'", requestIface)
-	cmd := exec.CommandContext(ctx, "dbus-monitor", "--session", match)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return 2, nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return 2, nil, err
-	}
-	defer func() {
-		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
-		}
-		_ = cmd.Wait()
-	}()
-
-	type response struct {
-		path    string
-		status  uint32
-		results map[string]string
-	}
-	respCh := make(chan response, 1)
-
-	var expectPath string
-	var expectMu sync.Mutex
-
-	go func() {
-		parsePortalResponses(stdout, func(path string, status uint32, results map[string]string) bool {
-			expectMu.Lock()
-			want := expectPath
-			expectMu.Unlock()
-			if want == "" || path != want {
-				return false
+	for {
+		select {
+		case <-ctx.Done():
+			return 2, nil, fmt.Errorf("portal request timed out")
+		case sig := <-sigCh:
+			if sig == nil || sig.Path != request || sig.Name != requestIface+".Response" {
+				continue
 			}
-			select {
-			case respCh <- response{path: path, status: status, results: results}:
-			default:
+			if len(sig.Body) < 2 {
+				continue
 			}
-			return true
-		})
-	}()
-
-	out, err := gdbusCall(method, args...)
-	if err != nil {
-		return 2, nil, err
-	}
-	path := parseObjectPath(out)
-	if path == "" {
-		return 2, nil, fmt.Errorf("%s: missing request path in %q", method, strings.TrimSpace(out))
-	}
-
-	expectMu.Lock()
-	expectPath = path
-	expectMu.Unlock()
-
-	select {
-	case r := <-respCh:
-		return r.status, r.results, nil
-	case <-ctx.Done():
-		return 2, nil, fmt.Errorf("portal request timed out")
-	}
-}
-
-func parsePortalResponses(r io.Reader, onResponse func(path string, status uint32, results map[string]string) bool) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.Contains(line, "member=Response") {
-			continue
-		}
-		path := parseSignalPath(line)
-		if path == "" {
-			continue
-		}
-		status, results := readResponseBody(scanner)
-		if onResponse(path, status, results) {
-			return
+			status, _ := sig.Body[0].(uint32)
+			results, _ := sig.Body[1].(map[string]dbus.Variant)
+			return status, results, nil
 		}
 	}
 }
 
-func readResponseBody(scanner *bufio.Scanner) (uint32, map[string]string) {
-	results := make(map[string]string)
-	var status uint32
-	gotStatus := false
-
-	for scanner.Scan() {
-		body := strings.TrimSpace(scanner.Text())
-		if body == "" {
-			if gotStatus {
-				return status, results
-			}
-			break
-		}
-		if strings.HasPrefix(body, "uint32 ") && !gotStatus {
-			fmt.Sscanf(body, "uint32 %d", &status)
-			gotStatus = true
-			continue
-		}
-		if strings.Contains(body, `string "session_handle"`) {
-			continue
-		}
-		if strings.Contains(body, "objectpath") {
-			if m := objectPathRE.FindStringSubmatch(body); len(m) >= 2 {
-				p := m[1]
-				if p == "" {
-					p = m[2]
-				}
-				results["session_handle"] = p
-			}
+func variantObjectPath(v dbus.Variant) (dbus.ObjectPath, bool) {
+	if v.Value() == nil {
+		return "", false
+	}
+	if v.Signature().String() == "o" {
+		if p, ok := v.Value().(dbus.ObjectPath); ok {
+			return p, true
 		}
 	}
-	return status, results
+	if s, ok := v.Value().(string); ok && len(s) > 0 && s[0] == '/' {
+		return dbus.ObjectPath(s), true
+	}
+	return "", false
 }
 
-func (b *portalBackend) startActivatedMonitor() error {
-	match := fmt.Sprintf(
+func (b *portalBackend) watchActivated() error {
+	rule := fmt.Sprintf(
 		"type='signal',interface='%s',member='Activated',path='%s'",
 		portalIface, portalObjectPath,
 	)
-	cmd := exec.Command("dbus-monitor", "--session", match)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
+	if err := b.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule).Err; err != nil {
 		return err
 	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	b.monitor = cmd
-
-	go b.readActivated(stdout)
+	go b.readActivated()
 	return nil
 }
 
-func (b *portalBackend) readActivated(r io.Reader) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
+func (b *portalBackend) readActivated() {
+	for {
 		select {
 		case <-b.stopCh:
 			return
-		default:
-		}
-		if !strings.Contains(scanner.Text(), "member=Activated") {
-			continue
-		}
-		for scanner.Scan() {
-			body := strings.TrimSpace(scanner.Text())
-			if body == "" {
-				break
+		case sig := <-b.sigCh:
+			if sig == nil || sig.Name != portalIface+".Activated" {
+				continue
 			}
-			if strings.Contains(body, `string "`+shortcutID+`"`) {
-				if b.onPress != nil {
-					b.onPress()
-				}
-				break
+			if len(sig.Body) < 2 {
+				continue
+			}
+			id, _ := sig.Body[1].(string)
+			if id == shortcutID && b.onPress != nil {
+				b.onPress()
 			}
 		}
 	}
@@ -279,55 +198,14 @@ func (b *portalBackend) readActivated(r io.Reader) {
 func (b *portalBackend) stop() {
 	b.stopOnce.Do(func() {
 		close(b.stopCh)
-		if b.monitor != nil && b.monitor.Process != nil {
-			_ = b.monitor.Process.Kill()
+		if b.conn != nil {
+			b.conn.Close()
 		}
 	})
 }
 
-func gdbusCall(method string, args ...string) (string, error) {
-	callArgs := []string{
-		"call", "--session",
-		"--dest", portalBusName,
-		"--object-path", portalObjectPath,
-		"--method", method,
-	}
-	callArgs = append(callArgs, args...)
-	out, err := exec.Command("gdbus", callArgs...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("%s: %w (%s)", method, err, strings.TrimSpace(string(out)))
-	}
-	return string(out), nil
-}
-
-func parseObjectPath(out string) string {
-	if m := objectPathRE.FindStringSubmatch(out); len(m) >= 2 {
-		if m[1] != "" {
-			return m[1]
-		}
-		return m[2]
-	}
-	out = strings.TrimSpace(out)
-	if strings.HasPrefix(out, "(['") {
-		out = strings.TrimPrefix(out, "(['")
-		out = strings.TrimSuffix(out, "',])")
-		out = strings.TrimSuffix(out, "'])")
-		if strings.HasPrefix(out, "/") {
-			return out
-		}
-	}
-	return ""
-}
-
-func parseSignalPath(line string) string {
-	if m := signalPathRE.FindStringSubmatch(line); len(m) == 2 {
-		return m[1]
-	}
-	return ""
-}
-
 func randomToken() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return "linboard_" + hex.EncodeToString(b)
+	buf := make([]byte, 8)
+	_, _ = rand.Read(buf)
+	return "linboard_" + hex.EncodeToString(buf)
 }

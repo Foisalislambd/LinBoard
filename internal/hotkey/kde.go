@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/platform"
+	"github.com/godbus/dbus/v5"
 )
 
 type kdeBackend struct{}
@@ -32,22 +34,19 @@ func setupKDEHotkey(exe string) error {
 		return skip("not KDE")
 	}
 
-	// KDE Plasma: custom command shortcut via khotkeys (khotkeysrc)
-	kwrite := "kwriteconfig6"
-	if !hasBin(kwrite) {
-		kwrite = "kwriteconfig5"
-	}
-	if !hasBin(kwrite) {
-		return fmt.Errorf("kwriteconfig not found")
-	}
-
 	uuid := "{linboard-toggle-0001}"
 	dataGroup := "Data_1 20 LinBoard"
 	path := filepath.Join(os.Getenv("HOME"), ".config", "khotkeysrc")
 
-	if strings.Contains(readFile(path), "linboard-toggle") {
-		_ = kwriteSet(kwrite, "khotkeysrc", dataGroup, "Command", exe+" toggle")
-		_ = kwriteSet(kwrite, "khotkeysrc", dataGroup, "Name", "LinBoard")
+	content := readFile(path)
+	if strings.Contains(content, "linboard-toggle") {
+		updated, err := patchKHotkeysINI(content, dataGroup, exe+" toggle")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+			return err
+		}
 		reloadKHotkeys()
 		return nil
 	}
@@ -81,13 +80,34 @@ func setupKDEHotkey(exe string) error {
 	return nil
 }
 
+func patchKHotkeysINI(content, group, command string) (string, error) {
+	section := "[" + group + "]"
+	if !strings.Contains(content, section) {
+		return "", fmt.Errorf("khotkeys section %q not found", group)
+	}
+	// Update every Command= line that runs linboard toggle (main + action sections).
+	re := regexp.MustCompile(`(?m)^Command=.*toggle\s*$`)
+	if !re.MatchString(content) {
+		return "", fmt.Errorf("khotkeys: no linboard toggle command found")
+	}
+	return re.ReplaceAllString(content, "Command="+command), nil
+}
+
 func reloadKHotkeys() {
-	for _, dbus := range []string{"qdbus6", "qdbus"} {
-		if !hasBin(dbus) {
-			continue
-		}
-		_ = run(dbus, "org.kde.kded6", "/kded", "org.kde.kded6.reloadModule", "khotkeys")
-		_ = run(dbus, "org.kde.kded5", "/kded", "org.kde.kded5.reloadModule", "khotkeys")
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	for _, spec := range []struct {
+		bus    string
+		iface  string
+	}{
+		{"org.kde.kded6", "org.kde.kded6"},
+		{"org.kde.kded5", "org.kde.kded5"},
+	} {
+		obj := conn.Object(spec.bus, "/kded")
+		_ = obj.Call(spec.iface+".reloadModule", 0, "khotkeys").Err
 	}
 }
 
@@ -107,8 +127,4 @@ func appendFile(path, content string) error {
 	defer f.Close()
 	_, err = f.WriteString(content)
 	return err
-}
-
-func kwriteSet(kwrite, file, group, key, value string) error {
-	return run(kwrite, "--file", file, "--group", group, "--key", key, value)
 }

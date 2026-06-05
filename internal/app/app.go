@@ -60,13 +60,13 @@ func New() (*App, error) {
 	a.fyneApp = fyneapp.NewWithID("com.linboard.app")
 	a.fyneApp.SetIcon(assets.Fyne())
 	clipboard.SetFyneWriter(func(text string) {
-		fyne.Do(func() {
+		fyne.DoAndWait(func() {
 			a.fyneApp.Clipboard().SetContent(text)
 		})
 	})
 	clipboard.SetFyneReader(func() string {
 		var text string
-		fyne.Do(func() {
+		fyne.DoAndWait(func() {
 			text = a.fyneApp.Clipboard().Content()
 		})
 		return text

@@ -2,7 +2,6 @@ package store
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/foisal/linboard/internal/config"
-	_ "modernc.org/sqlite"
 )
 
 type ContentType string
@@ -34,53 +32,19 @@ type Clip struct {
 }
 
 type Store struct {
-	db        *sql.DB
-	maxItems  int
-	imagesDir string
+	*fileStore
 }
 
 func Open(maxItems int) (*Store, error) {
-	dataDir, err := config.DataDir()
+	fs, err := openFileStore(maxItems)
 	if err != nil {
 		return nil, err
 	}
-	imagesDir, err := config.ImagesDir()
-	if err != nil {
-		return nil, err
-	}
-	dbPath := filepath.Join(dataDir, "history.db")
-	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		return nil, err
-	}
-	s := &Store{db: db, maxItems: maxItems, imagesDir: imagesDir}
-	if err := s.migrate(); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return s, nil
+	return &Store{fileStore: fs}, nil
 }
 
 func (s *Store) Close() error {
-	return s.db.Close()
-}
-
-func (s *Store) migrate() error {
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS clips (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			content TEXT NOT NULL DEFAULT '',
-			content_type TEXT NOT NULL DEFAULT 'text',
-			image_path TEXT NOT NULL DEFAULT '',
-			preview TEXT NOT NULL DEFAULT '',
-			pinned INTEGER NOT NULL DEFAULT 0,
-			created_at INTEGER NOT NULL,
-			hash TEXT NOT NULL UNIQUE
-		);
-		CREATE INDEX IF NOT EXISTS idx_clips_created ON clips(created_at DESC);
-		CREATE INDEX IF NOT EXISTS idx_clips_pinned ON clips(pinned DESC, created_at DESC);
-	`)
-	return err
+	return nil
 }
 
 func hashContent(content string, contentType ContentType) string {
@@ -132,34 +96,52 @@ func (s *Store) AddText(content string) (*Clip, error) {
 	if strings.TrimSpace(content) == "" {
 		return nil, nil
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	ct := detectType(content)
 	hash := hashContent(content, ct)
-	now := time.Now().Unix()
+	now := time.Now()
 
-	res, err := s.db.Exec(`
-		INSERT INTO clips (content, content_type, preview, created_at, hash)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(hash) DO UPDATE SET created_at = excluded.created_at
-	`, content, ct, makePreview(content, ct), now, hash)
-	if err != nil {
+	if i, existing := s.findByHash(hash); existing != nil {
+		s.clips[i].CreatedAt = now
+		if err := s.saveLocked(); err != nil {
+			return nil, err
+		}
+		s.pruneLocked()
+		c := s.clips[i]
+		return &c, nil
+	}
+
+	id := s.nextID
+	s.nextID++
+	c := Clip{
+		ID:          id,
+		Content:     content,
+		ContentType: ct,
+		Preview:     makePreview(content, ct),
+		CreatedAt:   now,
+		Hash:        hash,
+	}
+	s.clips = append(s.clips, c)
+	if err := s.saveLocked(); err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	if id == 0 {
-		row := s.db.QueryRow(`SELECT id FROM clips WHERE hash = ?`, hash)
-		_ = row.Scan(&id)
-	}
-
-	s.prune()
-	return s.GetByID(id)
+	s.pruneLocked()
+	return &c, nil
 }
 
 func (s *Store) AddImage(data []byte) (*Clip, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	hash := hashBytes(data, TypeImage)
-	now := time.Now().Unix()
+	now := time.Now()
 
 	filename := hash[:16] + ".png"
 	path := filepath.Join(s.imagesDir, filename)
@@ -170,159 +152,144 @@ func (s *Store) AddImage(data []byte) (*Clip, error) {
 	}
 
 	preview := fmt.Sprintf("[Image · %d KB]", len(data)/1024)
-	res, err := s.db.Exec(`
-		INSERT INTO clips (content, content_type, image_path, preview, created_at, hash)
-		VALUES ('', 'image', ?, ?, ?, ?)
-		ON CONFLICT(hash) DO UPDATE SET created_at = excluded.created_at
-	`, path, preview, now, hash)
-	if err != nil {
+	if i, existing := s.findByHash(hash); existing != nil {
+		s.clips[i].CreatedAt = now
+		if err := s.saveLocked(); err != nil {
+			return nil, err
+		}
+		s.pruneLocked()
+		c := s.clips[i]
+		return &c, nil
+	}
+
+	id := s.nextID
+	s.nextID++
+	c := Clip{
+		ID:          id,
+		ContentType: TypeImage,
+		ImagePath:   path,
+		Preview:     preview,
+		CreatedAt:   now,
+		Hash:        hash,
+	}
+	s.clips = append(s.clips, c)
+	if err := s.saveLocked(); err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
-	if id == 0 {
-		row := s.db.QueryRow(`SELECT id FROM clips WHERE hash = ?`, hash)
-		_ = row.Scan(&id)
-	}
-
-	s.prune()
-	return s.GetByID(id)
+	s.pruneLocked()
+	return &c, nil
 }
 
-func (s *Store) prune() {
-	if s.maxItems < 1 {
+func (s *Store) pruneLocked() {
+	if s.maxItems < 1 || len(s.clips) <= s.maxItems {
 		return
 	}
-	rows, err := s.db.Query(`
-		SELECT image_path FROM clips
-		WHERE pinned = 0 AND image_path != '' AND id NOT IN (
-			SELECT id FROM clips
-			ORDER BY pinned DESC, created_at DESC
-			LIMIT ?
-		)
-	`, s.maxItems)
-	if err == nil {
-		for rows.Next() {
-			var p string
-			if rows.Scan(&p) == nil && p != "" {
-				_ = os.Remove(p)
-			}
-		}
-		rows.Close()
+	indices := s.sortedIndices()
+	keep := make(map[int64]bool, s.maxItems)
+	for i := 0; i < len(indices) && i < s.maxItems; i++ {
+		keep[s.clips[indices[i]].ID] = true
 	}
-	_, _ = s.db.Exec(`
-		DELETE FROM clips WHERE id NOT IN (
-			SELECT id FROM clips
-			ORDER BY pinned DESC, created_at DESC
-			LIMIT ?
-		) AND pinned = 0
-	`, s.maxItems)
+	out := s.clips[:0]
+	for i := range s.clips {
+		c := s.clips[i]
+		if keep[c.ID] || c.Pinned {
+			out = append(out, c)
+			continue
+		}
+		if c.ImagePath != "" {
+			_ = os.Remove(c.ImagePath)
+		}
+	}
+	s.clips = out
+	_ = s.saveLocked()
 }
 
 func (s *Store) List(search string, limit int) ([]Clip, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	search = strings.TrimSpace(search)
-	var rows *sql.Rows
-	var err error
-	if search == "" {
-		rows, err = s.db.Query(`
-			SELECT id, content, content_type, image_path, preview, pinned, created_at, hash
-			FROM clips ORDER BY pinned DESC, created_at DESC LIMIT ?
-		`, limit)
-	} else {
-		pattern := "%" + search + "%"
-		rows, err = s.db.Query(`
-			SELECT id, content, content_type, image_path, preview, pinned, created_at, hash
-			FROM clips
-			WHERE preview LIKE ? OR content LIKE ?
-			ORDER BY pinned DESC, created_at DESC LIMIT ?
-		`, pattern, pattern, limit)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	search = strings.TrimSpace(strings.ToLower(search))
 
-	var clips []Clip
-	for rows.Next() {
-		c, err := scanClip(rows)
-		if err != nil {
-			return nil, err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	indices := s.sortedIndices()
+	clips := make([]Clip, 0, limit)
+	for _, i := range indices {
+		c := s.clips[i]
+		if search != "" {
+			needle := strings.ToLower(c.Preview + " " + c.Content)
+			if !strings.Contains(needle, search) {
+				continue
+			}
 		}
 		clips = append(clips, c)
+		if len(clips) >= limit {
+			break
+		}
 	}
-	return clips, rows.Err()
-}
-
-func scanClip(scanner interface {
-	Scan(dest ...any) error
-}) (Clip, error) {
-	var c Clip
-	var ct string
-	var pinned int
-	var created int64
-	if err := scanner.Scan(&c.ID, &c.Content, &ct, &c.ImagePath, &c.Preview, &pinned, &created, &c.Hash); err != nil {
-		return Clip{}, err
-	}
-	c.ContentType = ContentType(ct)
-	c.Pinned = pinned == 1
-	c.CreatedAt = time.Unix(created, 0)
-	return c, nil
+	return clips, nil
 }
 
 func (s *Store) GetByID(id int64) (*Clip, error) {
-	row := s.db.QueryRow(`
-		SELECT id, content, content_type, image_path, preview, pinned, created_at, hash
-		FROM clips WHERE id = ?
-	`, id)
-	c, err := scanClip(row)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c := s.findByID(id); c != nil {
+		cp := *c
+		return &cp, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+	return nil, nil
 }
 
 func (s *Store) TogglePin(id int64) error {
-	_, err := s.db.Exec(`
-		UPDATE clips SET pinned = CASE WHEN pinned = 1 THEN 0 ELSE 1 END WHERE id = ?
-	`, id)
-	return err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.clips {
+		if s.clips[i].ID == id {
+			s.clips[i].Pinned = !s.clips[i].Pinned
+			return s.saveLocked()
+		}
+	}
+	return nil
 }
 
 func (s *Store) Delete(id int64) error {
-	var imagePath string
-	_ = s.db.QueryRow(`SELECT image_path FROM clips WHERE id = ?`, id).Scan(&imagePath)
-	_, err := s.db.Exec(`DELETE FROM clips WHERE id = ?`, id)
-	if err == nil && imagePath != "" {
-		_ = os.Remove(imagePath)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.clips {
+		if s.clips[i].ID != id {
+			continue
+		}
+		if s.clips[i].ImagePath != "" {
+			_ = os.Remove(s.clips[i].ImagePath)
+		}
+		s.clips = append(s.clips[:i], s.clips[i+1:]...)
+		return s.saveLocked()
 	}
-	return err
+	return nil
 }
 
 func (s *Store) ClearUnpinned() error {
-	rows, err := s.db.Query(`SELECT image_path FROM clips WHERE pinned = 0 AND image_path != ''`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var p string
-		if err := rows.Scan(&p); err == nil && p != "" {
-			_ = os.Remove(p)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := s.clips[:0]
+	for _, c := range s.clips {
+		if c.Pinned {
+			out = append(out, c)
+			continue
+		}
+		if c.ImagePath != "" {
+			_ = os.Remove(c.ImagePath)
 		}
 	}
-	_, err = s.db.Exec(`DELETE FROM clips WHERE pinned = 0`)
-	return err
+	s.clips = out
+	return s.saveLocked()
 }
 
 func (s *Store) Count() (int, error) {
-	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM clips`).Scan(&n)
-	return n, err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.clips), nil
 }
 
 func FormatTime(t time.Time) string {
@@ -340,4 +307,13 @@ func FormatTime(t time.Time) string {
 	default:
 		return t.Format("Jan 2, 2006")
 	}
+}
+
+// DataFilePath returns the native history file path (for diagnostics).
+func DataFilePath() (string, error) {
+	dir, err := config.DataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "clips.json"), nil
 }
