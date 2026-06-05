@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	fyne.io/fyne/v2 v2.7.4
 	github.com/getlantern/systray v1.2.2
+	github.com/godbus/dbus/v5 v5.1.0
 	golang.design/x/clipboard v0.7.1
 	golang.design/x/hotkey v0.4.1
 	modernc.org/sqlite v1.51.0
@@ -35,7 +36,6 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.4 // indirect
-	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect

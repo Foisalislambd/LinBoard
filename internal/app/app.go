@@ -15,6 +15,7 @@ import (
 	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/hotkey"
+	"github.com/foisal/linboard/internal/ipc"
 	"github.com/foisal/linboard/internal/store"
 	"github.com/foisal/linboard/internal/tray"
 	"github.com/foisal/linboard/internal/ui"
@@ -28,6 +29,7 @@ type App struct {
 	monitor      *clipboard.Monitor
 	hotkey       *hotkey.Manager
 	tray         *tray.Tray
+	ipc          *ipc.Server
 	ctx          context.Context
 	cancel       context.CancelFunc
 	shutdownOnce sync.Once
@@ -71,21 +73,30 @@ func New() (*App, error) {
 	return a, nil
 }
 
+func (a *App) showHistory() {
+	a.fyneApp.Driver().DoFromGoroutine(func() {
+		a.history.Toggle()
+	}, false)
+}
+
 func (a *App) Run() {
 	a.monitor.OnChange(a.updateTrayCount)
 	a.monitor.Start(a.ctx)
 
-	a.hotkey.OnPress(func() {
-		a.fyneApp.Driver().DoFromGoroutine(func() {
-			a.history.Toggle()
-		}, false)
-	})
+	a.hotkey.OnPress(a.showHistory)
+
+	ipcSrv, err := ipc.StartServer(a.showHistory)
+	if err != nil {
+		log.Printf("ipc server failed: %v", err)
+	} else {
+		a.ipc = ipcSrv
+	}
 
 	a.tray.OnShow(func() {
 		a.fyneApp.Driver().DoFromGoroutine(func() {
 			a.history.Show()
 		}, false)
-	})
+	}) // tray menu always works as fallback
 	a.tray.OnClear(func() {
 		if err := a.store.ClearUnpinned(); err != nil {
 			log.Printf("clear history: %v", err)
@@ -98,7 +109,8 @@ func (a *App) Run() {
 
 	go func() {
 		if err := a.hotkey.Start(); err != nil {
-			log.Printf("hotkey registration failed: %v — use tray menu to open history", err)
+			log.Printf("hotkey registration failed: %v", err)
+			log.Printf("tray icon → Show History still works")
 		}
 	}()
 
@@ -127,6 +139,9 @@ func (a *App) Shutdown() {
 	a.shutdownOnce.Do(func() {
 		a.cancel()
 		a.hotkey.Stop()
+		if a.ipc != nil {
+			a.ipc.Close()
+		}
 		_ = a.store.Close()
 		a.fyneApp.Quit()
 	})

@@ -118,6 +118,16 @@ Config file: `~/.config/linboard/config.json`
 
 History hotkey is fixed at **Super+V** (Win key + V), like Windows.
 
+### Wayland / GNOME (Ubuntu)
+
+Ubuntu 24.04 GNOME has **no** `GlobalShortcuts` portal. LinBoard auto-registers **Super+V** via GNOME Settings (`gsettings`) on first start — same idea as CopyQ's system shortcut fallback.
+
+1. `make run` — Super+V is configured automatically
+2. Verify: **Settings → Keyboard → Custom Shortcuts** → `LinBoard`
+3. Test: `./linboard toggle` (while LinBoard is running)
+
+If Super+V conflicts with another app, change the binding in GNOME Settings.
+
 ## Data location
 
 - Config: `~/.config/linboard/config.json`
