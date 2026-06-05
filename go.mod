@@ -6,7 +6,6 @@ require (
 	fyne.io/fyne/v2 v2.7.4
 	github.com/getlantern/systray v1.2.2
 	github.com/godbus/dbus/v5 v5.1.0
-	golang.design/x/clipboard v0.7.1
 	golang.design/x/hotkey v0.4.1
 	modernc.org/sqlite v1.51.0
 )
@@ -61,12 +60,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/exp/shiny v0.0.0-20260603202125-055de637280b // indirect
 	golang.org/x/image v0.41.0 // indirect
-	golang.org/x/mobile v0.0.0-20260602190626-68735029466e // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.72.5 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

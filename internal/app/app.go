@@ -59,6 +59,11 @@ func New() (*App, error) {
 
 	a.fyneApp = fyneapp.NewWithID("com.linboard.app")
 	a.fyneApp.SetIcon(assets.Fyne())
+	clipboard.SetFyneWriter(func(text string) {
+		a.fyneApp.Driver().DoFromGoroutine(func() {
+			a.fyneApp.Clipboard().SetContent(text)
+		}, true)
+	})
 
 	switch cfg.Theme {
 	case "dark":
@@ -89,8 +94,9 @@ func (a *App) onClipboardChange() {
 }
 
 func (a *App) Run() {
-	log.Printf("LinBoard %s — %s / %s (paste: %s)",
-		config.AppVersion, platform.SessionDescription(), platform.DesktopName(), clipboard.PasteToolName())
+	log.Printf("LinBoard %s — %s / %s (clipboard read: %s, copy: %s, paste: %s)",
+		config.AppVersion, platform.SessionDescription(), platform.DesktopName(),
+		clipboard.ReadToolName(), clipboard.CopyToolName(), clipboard.PasteToolName())
 
 	// Start IPC first so Super+V works while the rest of the app initializes.
 	ipcSrv, err := ipc.StartServer(a.showHistory)

@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.design/x/clipboard"
-
 	"github.com/foisal/linboard/internal/store"
 )
+
+const pollInterval = 400 * time.Millisecond
 
 type Monitor struct {
 	store    *store.Store
@@ -35,63 +35,83 @@ func (m *Monitor) OnChange(fn func()) {
 }
 
 func (m *Monitor) Start(ctx context.Context) {
-	if err := clipboard.Init(); err != nil {
-		log.Printf("clipboard init failed: %v", err)
+	if ReadToolName() == "none" {
+		log.Printf("clipboard monitor: no read tool (install wl-clipboard or xclip)")
 		return
 	}
 
-	go m.watchText(ctx)
-	go m.watchImage(ctx)
+	go m.pollText(ctx)
+	go m.pollImage(ctx)
 }
 
-func (m *Monitor) watchText(ctx context.Context) {
-	ch := clipboard.Watch(ctx, clipboard.FmtText)
-	for data := range ch {
-		text := string(data)
-		m.mu.Lock()
-		if text == m.lastText {
+func (m *Monitor) pollText(ctx context.Context) {
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			text, err := readText()
+			if err != nil || text == "" {
+				continue
+			}
+
+			m.mu.Lock()
+			if text == m.lastText {
+				m.mu.Unlock()
+				continue
+			}
+			m.lastText = text
 			m.mu.Unlock()
-			continue
-		}
-		m.lastText = text
-		m.mu.Unlock()
 
-		if watchSuppress.Load() > 0 {
-			continue
-		}
+			if watchSuppress.Load() > 0 {
+				continue
+			}
 
-		if _, err := m.store.AddText(text); err != nil {
-			log.Printf("save text clip: %v", err)
-			continue
+			if _, err := m.store.AddText(text); err != nil {
+				log.Printf("save text clip: %v", err)
+				continue
+			}
+			m.notify()
 		}
-		m.notify()
 	}
 }
 
-func (m *Monitor) watchImage(ctx context.Context) {
-	ch := clipboard.Watch(ctx, clipboard.FmtImage)
-	for data := range ch {
-		if len(data) == 0 {
-			continue
-		}
-		key := imageFingerprint(data)
-		m.mu.Lock()
-		if key == m.lastImg {
+func (m *Monitor) pollImage(ctx context.Context) {
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			data, err := readImage()
+			if err != nil || len(data) == 0 {
+				continue
+			}
+
+			key := imageFingerprint(data)
+			m.mu.Lock()
+			if key == m.lastImg {
+				m.mu.Unlock()
+				continue
+			}
+			m.lastImg = key
 			m.mu.Unlock()
-			continue
-		}
-		m.lastImg = key
-		m.mu.Unlock()
 
-		if watchSuppress.Load() > 0 {
-			continue
-		}
+			if watchSuppress.Load() > 0 {
+				continue
+			}
 
-		if _, err := m.store.AddImage(data); err != nil {
-			log.Printf("save image clip: %v", err)
-			continue
+			if _, err := m.store.AddImage(data); err != nil {
+				log.Printf("save image clip: %v", err)
+				continue
+			}
+			m.notify()
 		}
-		m.notify()
 	}
 }
 
@@ -99,30 +119,6 @@ func (m *Monitor) notify() {
 	if m.onChange != nil {
 		m.onChange()
 	}
-}
-
-// WriteText puts text on the system clipboard and waits until the write completes.
-func WriteText(text string) error {
-	if err := clipboard.Init(); err != nil {
-		return err
-	}
-	done := clipboard.Write(clipboard.FmtText, []byte(text))
-	if done != nil {
-		<-done
-	}
-	return nil
-}
-
-// WriteImage puts PNG image bytes on the system clipboard and waits until done.
-func WriteImage(data []byte) error {
-	if err := clipboard.Init(); err != nil {
-		return err
-	}
-	done := clipboard.Write(clipboard.FmtImage, data)
-	if done != nil {
-		<-done
-	}
-	return nil
 }
 
 // CopyClip puts clip content on the system clipboard without pasting.

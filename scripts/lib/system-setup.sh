@@ -122,6 +122,22 @@ linboard_install_packages() {
   esac
 }
 
+linboard_install_clipboard_tools() {
+  linboard_detect_session
+  local need=()
+
+  if [[ "$LINBOARD_SESSION" == "wayland" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    if ! linboard_have wl-copy; then need+=("wl-clipboard"); fi
+  else
+    if ! linboard_have xclip && ! linboard_have xsel; then need+=("xclip"); fi
+  fi
+
+  [[ ${#need[@]} -eq 0 ]] && return 0
+
+  linboard_log "Setting up clipboard tools (${LINBOARD_SESSION} session)..."
+  linboard_install_packages "${need[@]}" || true
+}
+
 linboard_install_paste_tools() {
   linboard_detect_session
   local need=()
@@ -263,6 +279,7 @@ linboard_preflight_setup() {
     linboard_install_packages curl || true
   fi
 
+  linboard_install_clipboard_tools
   linboard_install_paste_tools
   linboard_install_gnome_tray
 }

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -120,7 +121,9 @@ func (h *HistoryWindow) build() {
 			timeLabel.SetText(store.FormatTime(clip.CreatedAt))
 			c := clip
 			copyBtn.OnTapped = func() {
-				_ = clipboard.CopyClip(&c)
+				if err := clipboard.CopyClip(&c); err != nil {
+					log.Printf("copy failed: %v", err)
+				}
 			}
 		},
 	)
