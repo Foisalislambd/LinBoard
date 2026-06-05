@@ -10,10 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/foisal/linboard/internal/platform"
 	"github.com/foisal/linboard/internal/store"
 )
 
-const pollInterval = 400 * time.Millisecond
+const (
+	textPollInterval  = 400 * time.Millisecond
+	imagePollInterval = 1500 * time.Millisecond
+)
 
 type Monitor struct {
 	store    *store.Store
@@ -23,10 +27,7 @@ type Monitor struct {
 	onChange func()
 }
 
-// activeMonitor is set on Start so CopyClip can sync last-seen state after writes.
 var activeMonitor *Monitor
-
-// watchSuppress prevents re-recording clipboard writes we perform ourselves.
 var watchSuppress atomic.Int32
 
 func NewMonitor(s *store.Store) *Monitor {
@@ -39,17 +40,22 @@ func (m *Monitor) OnChange(fn func()) {
 
 func (m *Monitor) Start(ctx context.Context) {
 	if ReadToolName() == "none" {
-		log.Printf("clipboard monitor: no read tool (install wl-clipboard or xclip)")
+		log.Printf("clipboard monitor: no read backend available")
 		return
 	}
 
 	activeMonitor = m
 	go m.pollText(ctx)
-	go m.pollImage(ctx)
+	if haveCommand("xclip") {
+		go m.pollImage(ctx)
+	} else if platform.UsePortalHotkey() {
+		log.Printf("clipboard monitor: image history needs xclip (XWayland); text via Fyne core")
+	}
+
 }
 
 func (m *Monitor) pollText(ctx context.Context) {
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(textPollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -84,7 +90,7 @@ func (m *Monitor) pollText(ctx context.Context) {
 }
 
 func (m *Monitor) pollImage(ctx context.Context) {
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(imagePollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -155,13 +161,10 @@ func PasteClip(clip *store.Clip) error {
 	if err := CopyClip(clip); err != nil {
 		return err
 	}
-
-	// Brief pause so focus returns to the previous window after our popup closes.
 	time.Sleep(120 * time.Millisecond)
 	return simulatePaste()
 }
 
-// noteTextSeen and noteImageSeen mark content we wrote so the poller skips it after suppress ends.
 func noteTextSeen(text string) {
 	if activeMonitor == nil {
 		return

@@ -20,6 +20,10 @@ const (
 type gnomeBackend struct{}
 
 func (b *gnomeBackend) start(_ func()) error {
+	if gnomeHotkeyConfigured() {
+		log.Printf("hotkey using GNOME shortcut: %s → linboard toggle", config.HotkeyLabel)
+		return nil
+	}
 	exe, err := executablePath()
 	if err != nil {
 		return err
@@ -29,6 +33,20 @@ func (b *gnomeBackend) start(_ func()) error {
 	}
 	log.Printf("hotkey registered (GNOME): %s → linboard toggle", config.HotkeyLabel)
 	return nil
+}
+
+func gnomeHotkeyConfigured() bool {
+	if !platform.IsGNOME() {
+		return false
+	}
+	bindingPath := "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/" + gnomeBindingName + "/"
+	schema := gnomeMediaKeys + ".custom-keybinding:" + bindingPath
+	cur, err := gsettingsGet(schema, "command")
+	if err != nil {
+		return false
+	}
+	cur = strings.Trim(cur, "'")
+	return strings.Contains(cur, "linboard") && strings.Contains(cur, "toggle")
 }
 
 func (b *gnomeBackend) stop() {}
@@ -41,10 +59,10 @@ func setupGNOMEHotkey(exe string) error {
 	bindingPath := "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/" + gnomeBindingName + "/"
 	schema := gnomeMediaKeys + ".custom-keybinding:" + bindingPath
 
-	// Already configured for this binary?
+	// Already configured for this binary — do not touch gsettings (re-setting binding can re-fire it on GNOME).
 	if cur, err := gsettingsGet(schema, "command"); err == nil {
+		cur = strings.Trim(cur, "'")
 		if strings.Contains(cur, exe) && strings.Contains(cur, "toggle") {
-			_ = gsettingsSet(schema, "binding", "<Super>v")
 			return nil
 		}
 	}

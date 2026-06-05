@@ -126,12 +126,13 @@ linboard_install_clipboard_tools() {
   linboard_detect_session
   local need=()
 
+  # Text clipboard uses LinBoard's Fyne/GLFW core on Wayland (no wl-clipboard).
+  # xclip is optional: image history via XWayland on GNOME, full clipboard on X11.
+  if ! linboard_have xclip && ! linboard_have xsel; then need+=("xclip"); fi
+
   if [[ "$LINBOARD_SESSION" == "wayland" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
-    if ! linboard_have wl-copy; then need+=("wl-clipboard"); fi
     if ! linboard_have gdbus; then need+=("libglib2.0-bin"); fi
     if ! linboard_have dbus-monitor; then need+=("dbus-user-session"); fi
-  else
-    if ! linboard_have xclip && ! linboard_have xsel; then need+=("xclip"); fi
   fi
 
   [[ ${#need[@]} -eq 0 ]] && return 0

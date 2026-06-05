@@ -55,6 +55,7 @@ cmd_run() {
   if [[ ! -x "$ROOT/$BINARY" ]]; then
     cmd_build
   fi
+  cmd_stop_quiet
   echo "==> Running $BINARY (Super+V to open history)"
   exec "$ROOT/$BINARY" "$@"
 }
@@ -111,6 +112,14 @@ cmd_install_shortcut() {
   "$ROOT/$BINARY" install-shortcut
 }
 
+cmd_stop_quiet() {
+  if pgrep -x "$BINARY" >/dev/null 2>&1; then
+    pkill -x "$BINARY" || true
+    sleep 0.3
+  fi
+  rm -f "${HOME}/.config/linboard/data/run/linboard.sock"
+}
+
 cmd_stop() {
   if pgrep -x "$BINARY" >/dev/null 2>&1; then
     pkill -x "$BINARY"
@@ -118,6 +127,7 @@ cmd_stop() {
   else
     echo "==> $BINARY is not running"
   fi
+  cmd_stop_quiet
 }
 
 case "${1:-help}" in

@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -28,8 +29,9 @@ type HistoryWindow struct {
 	clips    []store.Clip
 	selected int
 	search   *widget.Entry
-	mu       sync.Mutex
-	visible  bool
+	mu         sync.Mutex
+	visible    bool
+	lastToggle time.Time
 
 	onClose func()
 }
@@ -267,6 +269,11 @@ func (h *HistoryWindow) pinSelected() {
 
 func (h *HistoryWindow) Toggle() {
 	h.mu.Lock()
+	if time.Since(h.lastToggle) < 300*time.Millisecond {
+		h.mu.Unlock()
+		return
+	}
+	h.lastToggle = time.Now()
 	visible := h.visible
 	h.mu.Unlock()
 	if visible {
