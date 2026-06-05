@@ -102,22 +102,21 @@ func (m *Monitor) notify() {
 
 // WriteText puts text on the system clipboard and waits until the write completes.
 func WriteText(text string) error {
-	if err := clipboard.Init(); err != nil {
-		return err
-	}
-	done := clipboard.Write(clipboard.FmtText, []byte(text))
-	if done != nil {
-		<-done
-	}
-	return nil
+	return writeClipboard(clipboard.FmtText, []byte(text))
 }
 
 // WriteImage puts PNG image bytes on the system clipboard and waits until done.
 func WriteImage(data []byte) error {
+	return writeClipboard(clipboard.FmtImage, data)
+}
+
+func writeClipboard(format clipboard.Format, data []byte) error {
 	if err := clipboard.Init(); err != nil {
 		return err
 	}
-	done := clipboard.Write(clipboard.FmtImage, data)
+	watchSuppress.Add(1)
+	defer watchSuppress.Add(-1)
+	done := clipboard.Write(format, data)
 	if done != nil {
 		<-done
 	}
@@ -126,25 +125,24 @@ func WriteImage(data []byte) error {
 
 // PasteClip copies content to clipboard and simulates Ctrl+V in the previously focused window.
 func PasteClip(clip *store.Clip) error {
-	watchSuppress.Add(1)
-	defer watchSuppress.Add(-1)
+	if err := CopyClipToClipboard(clip); err != nil {
+		return err
+	}
+	return simulatePasteWithRetry()
+}
 
+// CopyClipToClipboard writes a history item to the system clipboard without simulating paste.
+func CopyClipToClipboard(clip *store.Clip) error {
 	switch clip.ContentType {
 	case store.TypeImage:
 		data, err := os.ReadFile(clip.ImagePath)
 		if err != nil {
 			return err
 		}
-		if err := WriteImage(data); err != nil {
-			return err
-		}
+		return WriteImage(data)
 	default:
-		if err := WriteText(clip.Content); err != nil {
-			return err
-		}
+		return WriteText(clip.Content)
 	}
-
-	return simulatePasteWithRetry()
 }
 
 func imageFingerprint(data []byte) string {

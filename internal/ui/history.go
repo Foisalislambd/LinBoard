@@ -20,6 +20,11 @@ import (
 	"github.com/foisal/linboard/internal/store"
 )
 
+const (
+	imageThumbW = 220
+	imageThumbH = 72
+)
+
 type HistoryWindow struct {
 	app      fyne.App
 	win      fyne.Window
@@ -72,7 +77,7 @@ func (h *HistoryWindow) build() {
 	h.win = h.app.NewWindow("LinBoard — Clipboard History")
 	h.win.SetIcon(assets.Fyne())
 	h.win.SetFixedSize(true)
-	h.win.Resize(fyne.NewSize(480, 420))
+	h.win.Resize(fyne.NewSize(520, 460))
 	h.win.SetCloseIntercept(func() {
 		h.Hide()
 	})
@@ -92,8 +97,12 @@ func (h *HistoryWindow) build() {
 		func() fyne.CanvasObject {
 			pinBtn := widget.NewButtonWithIcon("", theme.MediaRecordIcon(), nil)
 			pinBtn.Importance = widget.LowImportance
-			preview := widget.NewLabel("")
-			preview.Wrapping = fyne.TextTruncate
+			textPreview := widget.NewLabel("")
+			textPreview.Wrapping = fyne.TextTruncate
+			imgPreview := canvas.NewImageFromFile("")
+			imgPreview.FillMode = canvas.ImageFillContain
+			imgPreview.SetMinSize(fyne.NewSize(imageThumbW, imageThumbH))
+			center := container.NewStack(textPreview, imgPreview)
 			timeLabel := widget.NewLabel("")
 			timeLabel.TextStyle = fyne.TextStyle{Italic: true}
 			typeBadge := widget.NewLabel("")
@@ -102,7 +111,7 @@ func (h *HistoryWindow) build() {
 				nil, nil,
 				typeBadge,
 				timeLabel,
-				preview,
+				center,
 			))
 			return container.NewHBox(pinBtn, body)
 		},
@@ -112,15 +121,6 @@ func (h *HistoryWindow) build() {
 			row := rowBox.Objects[1].(*tapListRow)
 
 			itemID := int(id)
-			pinBtn.OnTapped = func() {
-				h.togglePinAt(itemID)
-			}
-			row.onTap = func() {
-				h.mu.Lock()
-				h.selected = itemID
-				h.mu.Unlock()
-				h.pasteSelected()
-			}
 
 			h.mu.Lock()
 			if id < 0 || id >= len(h.clips) {
@@ -128,10 +128,23 @@ func (h *HistoryWindow) build() {
 				return
 			}
 			clip := h.clips[id]
+			clipID := clip.ID
 			h.mu.Unlock()
 
+			pinBtn.OnTapped = func() {
+				h.togglePinByID(clipID)
+			}
+			row.onTap = func() {
+				h.mu.Lock()
+				h.selected = itemID
+				h.mu.Unlock()
+				h.pasteClipByID(clipID)
+			}
+
 			border := row.content.(*fyne.Container)
-			preview := border.Objects[0].(*widget.Label)
+			center := border.Objects[0].(*fyne.Container)
+			textPreview := center.Objects[0].(*widget.Label)
+			imgPreview := center.Objects[1].(*canvas.Image)
 			typeBadge := border.Objects[1].(*widget.Label)
 			timeLabel := border.Objects[2].(*widget.Label)
 
@@ -152,7 +165,23 @@ func (h *HistoryWindow) build() {
 				typeBadge.SetText("TXT")
 			}
 
-			preview.SetText(clip.Preview)
+			showImage := clip.ContentType == store.TypeImage && clip.ImagePath != ""
+			if showImage {
+				if _, err := os.Stat(clip.ImagePath); err != nil {
+					showImage = false
+				}
+			}
+			if showImage {
+				textPreview.Hide()
+				imgPreview.File = clip.ImagePath
+				imgPreview.Show()
+				imgPreview.Refresh()
+			} else {
+				imgPreview.Hide()
+				imgPreview.File = ""
+				textPreview.SetText(clip.Preview)
+				textPreview.Show()
+			}
 			timeLabel.SetText(store.FormatTime(clip.CreatedAt))
 		},
 	)
@@ -198,8 +227,10 @@ func (h *HistoryWindow) build() {
 }
 
 func (h *HistoryWindow) handleKey(ev *fyne.KeyEvent) {
-	// Let the search field handle printable text input.
-	if h.win.Canvas().Focused() == h.search && ev.Name == fyne.KeyP {
+	if h.win.Canvas().Focused() == h.search {
+		if ev.Name == fyne.KeyEscape {
+			h.Hide()
+		}
 		return
 	}
 
@@ -263,14 +294,25 @@ func (h *HistoryWindow) pasteSelected() {
 		h.mu.Unlock()
 		return
 	}
-	clip := h.clips[h.selected]
-	pasteOnSelect := h.cfg.PasteOnSelect
+	clipID := h.clips[h.selected].ID
 	h.mu.Unlock()
+	h.pasteClipByID(clipID)
+}
 
+func (h *HistoryWindow) pasteClipByID(id int64) {
+	clip, err := h.store.GetByID(id)
+	if err != nil || clip == nil {
+		return
+	}
+	h.pasteClip(clip)
+}
+
+func (h *HistoryWindow) pasteClip(clip *store.Clip) {
+	pasteOnSelect := h.cfg.PasteOnSelect
 	h.Hide()
 
 	if pasteOnSelect {
-		clipCopy := clip
+		clipCopy := *clip
 		go func() {
 			if err := clipboard.PasteClip(&clipCopy); err != nil {
 				log.Printf("paste failed: %v", err)
@@ -279,14 +321,8 @@ func (h *HistoryWindow) pasteSelected() {
 		return
 	}
 
-	switch clip.ContentType {
-	case store.TypeImage:
-		data, err := os.ReadFile(clip.ImagePath)
-		if err == nil {
-			_ = clipboard.WriteImage(data)
-		}
-	default:
-		_ = clipboard.WriteText(clip.Content)
+	if err := clipboard.CopyClipToClipboard(clip); err != nil {
+		log.Printf("copy to clipboard failed: %v", err)
 	}
 }
 
@@ -317,6 +353,10 @@ func (h *HistoryWindow) togglePinAt(index int) {
 	}
 	id := h.clips[index].ID
 	h.mu.Unlock()
+	h.togglePinByID(id)
+}
+
+func (h *HistoryWindow) togglePinByID(id int64) {
 	_ = h.store.TogglePin(id)
 	h.refreshList()
 }
