@@ -8,7 +8,6 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"golang.design/x/clipboard"
 
@@ -145,9 +144,7 @@ func PasteClip(clip *store.Clip) error {
 		}
 	}
 
-	// Brief pause so focus returns to the previous window after our popup closes.
-	time.Sleep(120 * time.Millisecond)
-	return simulatePaste()
+	return simulatePasteWithRetry()
 }
 
 func imageFingerprint(data []byte) string {

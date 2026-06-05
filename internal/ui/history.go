@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -32,6 +33,29 @@ type HistoryWindow struct {
 	visible  bool
 
 	onClose func()
+}
+
+// tapListRow makes list rows clickable (Windows-style: click item to paste).
+type tapListRow struct {
+	widget.BaseWidget
+	content fyne.CanvasObject
+	onTap   func()
+}
+
+func newTapListRow(content fyne.CanvasObject) *tapListRow {
+	r := &tapListRow{content: content}
+	r.ExtendBaseWidget(r)
+	return r
+}
+
+func (r *tapListRow) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(r.content)
+}
+
+func (r *tapListRow) Tapped(*fyne.PointEvent) {
+	if r.onTap != nil {
+		r.onTap()
+	}
 }
 
 func NewHistoryWindow(app fyne.App, s *store.Store, cfg *config.Config) *HistoryWindow {
@@ -66,21 +90,38 @@ func (h *HistoryWindow) build() {
 			return len(h.clips)
 		},
 		func() fyne.CanvasObject {
-			pinIcon := widget.NewIcon(theme.MediaRecordIcon())
+			pinBtn := widget.NewButtonWithIcon("", theme.MediaRecordIcon(), nil)
+			pinBtn.Importance = widget.LowImportance
 			preview := widget.NewLabel("")
 			preview.Wrapping = fyne.TextTruncate
 			timeLabel := widget.NewLabel("")
 			timeLabel.TextStyle = fyne.TextStyle{Italic: true}
 			typeBadge := widget.NewLabel("")
 			typeBadge.TextStyle = fyne.TextStyle{Bold: true}
-			return container.NewBorder(
+			body := newTapListRow(container.NewBorder(
 				nil, nil,
-				container.NewHBox(pinIcon, typeBadge),
+				typeBadge,
 				timeLabel,
 				preview,
-			)
+			))
+			return container.NewHBox(pinBtn, body)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			rowBox := obj.(*fyne.Container)
+			pinBtn := rowBox.Objects[0].(*widget.Button)
+			row := rowBox.Objects[1].(*tapListRow)
+
+			itemID := int(id)
+			pinBtn.OnTapped = func() {
+				h.togglePinAt(itemID)
+			}
+			row.onTap = func() {
+				h.mu.Lock()
+				h.selected = itemID
+				h.mu.Unlock()
+				h.pasteSelected()
+			}
+
 			h.mu.Lock()
 			if id < 0 || id >= len(h.clips) {
 				h.mu.Unlock()
@@ -88,19 +129,18 @@ func (h *HistoryWindow) build() {
 			}
 			clip := h.clips[id]
 			h.mu.Unlock()
-			// NewBorder order: center, left, right (see fyne container.NewBorder)
-			border := obj.(*fyne.Container)
+
+			border := row.content.(*fyne.Container)
 			preview := border.Objects[0].(*widget.Label)
-			left := border.Objects[1].(*fyne.Container)
+			typeBadge := border.Objects[1].(*widget.Label)
 			timeLabel := border.Objects[2].(*widget.Label)
-			pinIcon := left.Objects[0].(*widget.Icon)
-			typeBadge := left.Objects[1].(*widget.Label)
 
 			if clip.Pinned {
-				pinIcon.SetResource(theme.MediaRecordIcon())
-				pinIcon.Show()
+				pinBtn.SetIcon(theme.MediaRecordIcon())
+				pinBtn.Importance = widget.HighImportance
 			} else {
-				pinIcon.Hide()
+				pinBtn.SetIcon(theme.RadioButtonIcon())
+				pinBtn.Importance = widget.LowImportance
 			}
 
 			switch clip.ContentType {
@@ -124,7 +164,7 @@ func (h *HistoryWindow) build() {
 	}
 	h.list.OnUnselected = func(_ widget.ListItemID) {}
 
-	help := widget.NewLabel("↑↓ Navigate  •  Enter Paste  •  Del Remove  •  P Pin  •  Esc Close")
+	help := widget.NewLabel("Click Paste  •  📌 Pin icon  •  ↑↓ Navigate  •  Enter  •  Del  •  Esc Close")
 	help.TextStyle = fyne.TextStyle{Italic: true}
 	help.Alignment = fyne.TextAlignCenter
 
@@ -224,21 +264,29 @@ func (h *HistoryWindow) pasteSelected() {
 		return
 	}
 	clip := h.clips[h.selected]
+	pasteOnSelect := h.cfg.PasteOnSelect
 	h.mu.Unlock()
 
 	h.Hide()
-	if h.cfg.PasteOnSelect {
-		_ = clipboard.PasteClip(&clip)
-	} else {
-		switch clip.ContentType {
-		case store.TypeImage:
-			data, err := os.ReadFile(clip.ImagePath)
-			if err == nil {
-				_ = clipboard.WriteImage(data)
+
+	if pasteOnSelect {
+		clipCopy := clip
+		go func() {
+			if err := clipboard.PasteClip(&clipCopy); err != nil {
+				log.Printf("paste failed: %v", err)
 			}
-		default:
-			_ = clipboard.WriteText(clip.Content)
+		}()
+		return
+	}
+
+	switch clip.ContentType {
+	case store.TypeImage:
+		data, err := os.ReadFile(clip.ImagePath)
+		if err == nil {
+			_ = clipboard.WriteImage(data)
 		}
+	default:
+		_ = clipboard.WriteText(clip.Content)
 	}
 }
 
@@ -256,11 +304,18 @@ func (h *HistoryWindow) deleteSelected() {
 
 func (h *HistoryWindow) pinSelected() {
 	h.mu.Lock()
-	if h.selected < 0 || h.selected >= len(h.clips) {
+	sel := h.selected
+	h.mu.Unlock()
+	h.togglePinAt(sel)
+}
+
+func (h *HistoryWindow) togglePinAt(index int) {
+	h.mu.Lock()
+	if index < 0 || index >= len(h.clips) {
 		h.mu.Unlock()
 		return
 	}
-	id := h.clips[h.selected].ID
+	id := h.clips[index].ID
 	h.mu.Unlock()
 	_ = h.store.TogglePin(id)
 	h.refreshList()
@@ -278,6 +333,9 @@ func (h *HistoryWindow) Toggle() {
 }
 
 func (h *HistoryWindow) Show() {
+	// Remember where the user was typing before we take focus (for auto-paste).
+	clipboard.RememberPasteTarget()
+
 	h.search.SetText("")
 	h.refreshList()
 	h.win.CenterOnScreen()
