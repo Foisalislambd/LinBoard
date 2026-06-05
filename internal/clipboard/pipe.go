@@ -34,9 +34,9 @@ func outputFromCommand(bin string, args []string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Read failures are routine while polling (e.g. image type absent); callers decide whether to log.
 	out, err := exec.Command(path, args...).Output()
 	if err != nil {
-		log.Printf("clipboard read (%s): %v", bin, err)
 		return nil, err
 	}
 	return out, nil

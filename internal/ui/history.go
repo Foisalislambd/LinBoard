@@ -3,7 +3,6 @@ package ui
 import (
 	"image/color"
 	"log"
-	"os"
 	"strings"
 	"sync"
 
@@ -238,15 +237,7 @@ func (h *HistoryWindow) pasteSelected() {
 	if h.cfg.PasteOnSelect {
 		_ = clipboard.PasteClip(&clip)
 	} else {
-		switch clip.ContentType {
-		case store.TypeImage:
-			data, err := os.ReadFile(clip.ImagePath)
-			if err == nil {
-				_ = clipboard.WriteImage(data)
-			}
-		default:
-			_ = clipboard.WriteText(clip.Content)
-		}
+		_ = clipboard.CopyClip(&clip)
 	}
 }
 
