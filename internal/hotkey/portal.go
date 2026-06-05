@@ -25,7 +25,10 @@ const (
 	shortcutID       = "linboard_toggle"
 )
 
-var objectPathRE = regexp.MustCompile(`objectpath\s+'([^']+)'`)
+var (
+	objectPathRE  = regexp.MustCompile(`objectpath\s+(?:'([^']+)'|(/[^\s;]+))`)
+	signalPathRE  = regexp.MustCompile(`\bpath=([^;\s]+)`)
+)
 
 type portalBackend struct {
 	onPress  func()
@@ -35,6 +38,13 @@ type portalBackend struct {
 }
 
 func (b *portalBackend) start(onPress func()) error {
+	if !hasBin("gdbus") {
+		return fmt.Errorf("gdbus not found (install libglib2.0-bin)")
+	}
+	if !hasBin("dbus-monitor") {
+		return fmt.Errorf("dbus-monitor not found (install dbus-user-session)")
+	}
+
 	b.onPress = onPress
 	b.stopCh = make(chan struct{})
 
@@ -60,20 +70,11 @@ func (b *portalBackend) setup() error {
 
 func (b *portalBackend) createSession() (string, error) {
 	token := randomToken()
-	opts := fmt.Sprintf("{'handle_token': <%q>, 'session_handle_token': <'linboard'>}", token)
+	opts := fmt.Sprintf("{'handle_token': <'%s'>, 'session_handle_token': <'linboard'>}", token)
 
-	out, err := gdbusCall(portalIface+".CreateSession", opts)
+	status, results, err := portalCall(30*time.Second, portalIface+".CreateSession", opts)
 	if err != nil {
 		return "", fmt.Errorf("CreateSession: %w", err)
-	}
-	requestPath := parseObjectPath(out)
-	if requestPath == "" {
-		return "", fmt.Errorf("CreateSession: missing request path")
-	}
-
-	status, results, err := waitPortalResponse(requestPath, 30*time.Second)
-	if err != nil {
-		return "", err
 	}
 	if status != 0 {
 		return "", fmt.Errorf("CreateSession failed (status %d)", status)
@@ -88,12 +89,13 @@ func (b *portalBackend) createSession() (string, error) {
 func (b *portalBackend) bindShortcuts(session string) error {
 	token := randomToken()
 	shortcuts := fmt.Sprintf(
-		"[('%s', {'description': <%q>, 'preferred_trigger': <'LOGO+V'>})]",
+		"[('%s', {'description': <'%s'>, 'preferred_trigger': <'LOGO+V'>})]",
 		shortcutID, config.AppName,
 	)
-	opts := fmt.Sprintf("{'handle_token': <%q>}", token)
+	opts := fmt.Sprintf("{'handle_token': <'%s'>}", token)
 
-	out, err := gdbusCall(
+	status, _, err := portalCall(
+		60*time.Second,
 		portalIface+".BindShortcuts",
 		fmt.Sprintf("objectpath '%s'", session),
 		shortcuts,
@@ -103,26 +105,133 @@ func (b *portalBackend) bindShortcuts(session string) error {
 	if err != nil {
 		return fmt.Errorf("BindShortcuts: %w", err)
 	}
-	requestPath := parseObjectPath(out)
-	if requestPath == "" {
-		return fmt.Errorf("BindShortcuts: missing request path")
-	}
-
-	status, _, err := waitPortalResponse(requestPath, 60*time.Second)
-	if err != nil {
-		return err
-	}
 	if status != 0 {
 		return fmt.Errorf("BindShortcuts failed (status %d)", status)
 	}
 	return nil
 }
 
-func (b *portalBackend) startActivatedMonitor() error {
-	if !hasBin("dbus-monitor") {
-		return fmt.Errorf("dbus-monitor not found (install dbus-user-session)")
+// portalCall starts dbus-monitor before the gdbus call to avoid missing fast Response signals.
+func portalCall(timeout time.Duration, method string, args ...string) (uint32, map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	match := fmt.Sprintf("type='signal',interface='%s',member='Response'", requestIface)
+	cmd := exec.CommandContext(ctx, "dbus-monitor", "--session", match)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return 2, nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return 2, nil, err
+	}
+	defer func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		_ = cmd.Wait()
+	}()
+
+	type response struct {
+		path    string
+		status  uint32
+		results map[string]string
+	}
+	respCh := make(chan response, 1)
+
+	var expectPath string
+	var expectMu sync.Mutex
+
+	go func() {
+		parsePortalResponses(stdout, func(path string, status uint32, results map[string]string) bool {
+			expectMu.Lock()
+			want := expectPath
+			expectMu.Unlock()
+			if want == "" || path != want {
+				return false
+			}
+			select {
+			case respCh <- response{path: path, status: status, results: results}:
+			default:
+			}
+			return true
+		})
+	}()
+
+	out, err := gdbusCall(method, args...)
+	if err != nil {
+		return 2, nil, err
+	}
+	path := parseObjectPath(out)
+	if path == "" {
+		return 2, nil, fmt.Errorf("%s: missing request path in %q", method, strings.TrimSpace(out))
 	}
 
+	expectMu.Lock()
+	expectPath = path
+	expectMu.Unlock()
+
+	select {
+	case r := <-respCh:
+		return r.status, r.results, nil
+	case <-ctx.Done():
+		return 2, nil, fmt.Errorf("portal request timed out")
+	}
+}
+
+func parsePortalResponses(r io.Reader, onResponse func(path string, status uint32, results map[string]string) bool) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.Contains(line, "member=Response") {
+			continue
+		}
+		path := parseSignalPath(line)
+		if path == "" {
+			continue
+		}
+		status, results := readResponseBody(scanner)
+		if onResponse(path, status, results) {
+			return
+		}
+	}
+}
+
+func readResponseBody(scanner *bufio.Scanner) (uint32, map[string]string) {
+	results := make(map[string]string)
+	var status uint32
+	gotStatus := false
+
+	for scanner.Scan() {
+		body := strings.TrimSpace(scanner.Text())
+		if body == "" {
+			if gotStatus {
+				return status, results
+			}
+			break
+		}
+		if strings.HasPrefix(body, "uint32 ") && !gotStatus {
+			fmt.Sscanf(body, "uint32 %d", &status)
+			gotStatus = true
+			continue
+		}
+		if strings.Contains(body, `string "session_handle"`) {
+			continue
+		}
+		if strings.Contains(body, "objectpath") {
+			if m := objectPathRE.FindStringSubmatch(body); len(m) >= 2 {
+				p := m[1]
+				if p == "" {
+					p = m[2]
+				}
+				results["session_handle"] = p
+			}
+		}
+	}
+	return status, results
+}
+
+func (b *portalBackend) startActivatedMonitor() error {
 	match := fmt.Sprintf(
 		"type='signal',interface='%s',member='Activated',path='%s'",
 		portalIface, portalObjectPath,
@@ -149,21 +258,18 @@ func (b *portalBackend) readActivated(r io.Reader) {
 			return
 		default:
 		}
-		line := scanner.Text()
-		if !strings.Contains(line, "member=Activated") {
-			continue
-		}
-		// Next lines contain signal body; shortcut id is the second argument.
-		if !scanner.Scan() {
+		if !strings.Contains(scanner.Text(), "member=Activated") {
 			continue
 		}
 		for scanner.Scan() {
-			body := scanner.Text()
-			if strings.TrimSpace(body) == "" {
+			body := strings.TrimSpace(scanner.Text())
+			if body == "" {
 				break
 			}
-			if strings.Contains(body, `string "`+shortcutID+`"`) && b.onPress != nil {
-				b.onPress()
+			if strings.Contains(body, `string "`+shortcutID+`"`) {
+				if b.onPress != nil {
+					b.onPress()
+				}
 				break
 			}
 		}
@@ -194,69 +300,13 @@ func gdbusCall(method string, args ...string) (string, error) {
 	return string(out), nil
 }
 
-func waitPortalResponse(requestPath string, timeout time.Duration) (uint32, map[string]string, error) {
-	if !hasBin("dbus-monitor") {
-		return 2, nil, fmt.Errorf("dbus-monitor not found")
-	}
-
-	match := fmt.Sprintf(
-		"type='signal',interface='%s',member='Response',path='%s'",
-		requestIface, requestPath,
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "dbus-monitor", "--session", match)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return 2, nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return 2, nil, err
-	}
-
-	status, results := parsePortalResponse(stdout)
-	_ = cmd.Wait()
-	if ctx.Err() == context.DeadlineExceeded {
-		return 2, nil, fmt.Errorf("portal request timed out")
-	}
-	return status, results, nil
-}
-
-func parsePortalResponse(r io.Reader) (uint32, map[string]string) {
-	results := make(map[string]string)
-	scanner := bufio.NewScanner(r)
-	var status uint32
-	gotStatus := false
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "uint32 ") && !gotStatus {
-			fmt.Sscanf(line, "uint32 %d", &status)
-			gotStatus = true
-			continue
-		}
-		if strings.Contains(line, `string "session_handle"`) {
-			continue
-		}
-		if strings.Contains(line, "objectpath") {
-			if m := objectPathRE.FindStringSubmatch(line); len(m) == 2 {
-				results["session_handle"] = m[1]
-			}
-		}
-	}
-	return status, results
-}
-
 func parseObjectPath(out string) string {
-	if m := objectPathRE.FindStringSubmatch(out); len(m) == 2 {
-		return m[1]
+	if m := objectPathRE.FindStringSubmatch(out); len(m) >= 2 {
+		if m[1] != "" {
+			return m[1]
+		}
+		return m[2]
 	}
-	// gdbus sometimes prints bare quoted paths
 	out = strings.TrimSpace(out)
 	if strings.HasPrefix(out, "(['") {
 		out = strings.TrimPrefix(out, "(['")
@@ -265,6 +315,13 @@ func parseObjectPath(out string) string {
 		if strings.HasPrefix(out, "/") {
 			return out
 		}
+	}
+	return ""
+}
+
+func parseSignalPath(line string) string {
+	if m := signalPathRE.FindStringSubmatch(line); len(m) == 2 {
+		return m[1]
 	}
 	return ""
 }

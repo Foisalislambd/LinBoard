@@ -6,7 +6,7 @@ import (
 )
 
 func portalHasGlobalShortcuts() bool {
-	if !hasBin("gdbus") {
+	if !hasBin("gdbus") || !hasBin("dbus-monitor") {
 		return false
 	}
 	out, err := exec.Command("gdbus", "introspect", "--session",
