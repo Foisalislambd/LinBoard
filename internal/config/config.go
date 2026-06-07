@@ -17,7 +17,7 @@ var AppVersion = "dev"
 type Config struct {
 	MaxHistory     int    `json:"max_history"`
 	StartMinimized bool   `json:"start_minimized"`
-	PasteOnSelect  bool   `json:"paste_on_select"` // auto-paste when item selected
+	PasteOnSelect  bool   `json:"paste_on_select"` // copy + auto-paste to previous window (CopyQ-style)
 	Theme          string `json:"theme"`           // light, dark, system
 }
 

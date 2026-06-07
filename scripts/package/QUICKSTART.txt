@@ -2,14 +2,19 @@ LinBoard — Quick Start
 ======================
 
 1. Run: ./install.sh
-   (installs everything automatically — deps, shortcut, autostart)
-2. Press Super+V (Win key + V) to open clipboard history
+   (installs deps, uinput paste setup, shortcut, autostart)
+2. If prompted: log out and back in (activates auto-paste)
+3. Press Super+V (Win key + V) to open clipboard history
+4. Click an item — it pastes to your previous window (CopyQ-style)
 
 Commands:
-  linboard              Start (system tray)
+  linboard-start        Start with correct paste permissions
+  linboard              Start directly
   linboard toggle       Show/hide history
+  linboard setup-paste  Check auto-paste status
+  linboard doctor       Check shortcut + paste
   linboard install-shortcut   Re-register Super+V
 
-Works on: GNOME, KDE Plasma, XFCE, Cinnamon, X11 and Wayland.
+Works on: GNOME, KDE Plasma, XFCE, Cinnamon, MATE — X11 and Wayland.
 
 Support: https://github.com/Foisalislambd/LinBoard

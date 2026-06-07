@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/foisal/linboard/internal/app"
+	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/hotkey"
 	"github.com/foisal/linboard/internal/install"
@@ -52,10 +53,14 @@ func main() {
 			_ = hotkey.SetupAt(exe)
 			report := hotkey.Verify(exe)
 			hotkey.PrintVerify(report)
-			if !report.Healthy() {
+			clipboard.PrintPasteSetup()
+			if !report.Healthy() || clipboard.SetupPasteExitCode() != 0 {
 				os.Exit(1)
 			}
 			return
+		case "setup-paste":
+			clipboard.PrintPasteSetup()
+			os.Exit(clipboard.SetupPasteExitCode())
 		case "version", "-v", "--version":
 			fmt.Printf("LinBoard %s\n", config.AppVersion)
 			return
@@ -95,6 +100,7 @@ Usage:
   linboard install          Install to ~/.local/bin + autostart + Super+V
   linboard install-shortcut Register Super+V only
   linboard doctor           Check shortcut & dependencies
+  linboard setup-paste      Check auto-paste (uinput) on Linux
   linboard version          Print version
   linboard help             Show this help
 

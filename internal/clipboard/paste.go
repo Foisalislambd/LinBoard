@@ -1,58 +1,137 @@
 package clipboard
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/foisal/linboard/internal/platform"
 )
 
-// simulatePaste sends Ctrl+V to the focused window using the best tool available.
-func simulatePaste() error {
-	tools := pasteTools()
-	for _, t := range tools {
-		if _, err := exec.LookPath(t.bin); err != nil {
-			continue
-		}
-		cmd := exec.Command(t.bin, t.args...)
-		if err := cmd.Run(); err != nil {
-			log.Printf("auto-paste (%s) failed: %v", t.bin, err)
-			continue
-		}
-		return nil
-	}
-	log.Printf("auto-paste: no tool found (install wtype, ydotool, or xdotool) — content is on clipboard")
-	return fmt.Errorf("no paste tool found (install wtype, ydotool, or xdotool)")
-}
+var pasteHintOnce sync.Once
 
-type pasteTool struct {
+type pasteShortcut struct {
+	name string
 	bin  string
 	args []string
 }
 
-func pasteTools() []pasteTool {
+// PasteToTarget restores the previous window and simulates paste (CopyQ-style).
+func PasteToTarget() error {
+	delay := 150 * time.Millisecond
 	if platform.UsePortalHotkey() {
-		// Wayland: wtype and ydotool work; xdotool usually does not.
-		return []pasteTool{
-			{bin: "wtype", args: []string{"-M", "ctrl", "-k", "v"}},
-			{bin: "ydotool", args: []string{"key", "29:1", "47:1", "47:0", "29:0"}}, // ctrl+v
-			{bin: "xdotool", args: []string{"key", "ctrl+v"}},
+		delay = 280 * time.Millisecond
+	}
+	time.Sleep(delay)
+	platform.RestorePasteTarget()
+	time.Sleep(120 * time.Millisecond)
+	return simulatePaste()
+}
+
+func simulatePaste() error {
+	// Built-in uinput works on all Linux desktops (GNOME/KDE/XFCE/X11/Wayland).
+	if err := pasteViaUinput(); err == nil {
+		return nil
+	} else if !errors.Is(err, errUinputUnavailable) {
+		log.Printf("auto-paste (uinput) failed: %v", err)
+	}
+
+	// X11 and XWayland apps: xdotool after focus restore.
+	if useXdotoolPaste() {
+		for _, s := range xdotoolShortcuts() {
+			if err := runPasteShortcut(s); err == nil {
+				return nil
+			}
 		}
 	}
-	return []pasteTool{
-		{bin: "xdotool", args: []string{"key", "ctrl+v"}},
-		{bin: "wtype", args: []string{"-M", "ctrl", "-k", "v"}},
-		{bin: "ydotool", args: []string{"key", "29:1", "47:1", "47:0", "29:0"}},
+
+	pasteHintOnce.Do(func() {
+		if hint := PasteSessionHint(); hint != "" {
+			log.Printf("auto-paste: %s", strings.ReplaceAll(hint, "\n", " "))
+		} else {
+			log.Printf("auto-paste failed — run: linboard setup-paste")
+		}
+	})
+	return fmt.Errorf("auto-paste unavailable")
+}
+
+func useXdotoolPaste() bool {
+	if !hasBin("xdotool") {
+		return false
+	}
+	if !platform.UsePortalHotkey() {
+		return true
+	}
+	return platform.HasPasteTarget()
+}
+
+func runPasteShortcut(s pasteShortcut) error {
+	cmd := exec.Command(s.bin, s.args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(out))
+		if detail != "" {
+			log.Printf("auto-paste (%s) failed: %v: %s", s.name, err, detail)
+		} else {
+			log.Printf("auto-paste (%s) failed: %v", s.name, err)
+		}
+		return err
+	}
+	return nil
+}
+
+func xdotoolShortcuts() []pasteShortcut {
+	return []pasteShortcut{
+		{name: "xdotool-ctrl-v", bin: "xdotool", args: []string{"key", "ctrl+v"}},
+		{name: "xdotool-shift-insert", bin: "xdotool", args: []string{"key", "shift+Insert"}},
 	}
 }
 
-// PasteToolName returns the first available paste tool for diagnostics.
+// PasteReady reports whether auto-paste should work in this session.
+func PasteReady() bool {
+	if uinputReady() {
+		return true
+	}
+	return useXdotoolPaste()
+}
+
+func hasBin(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+// PasteSetupHint returns one-time setup instructions when paste is unavailable.
+func PasteSetupHint() string {
+	return `Linux auto-paste needs /dev/uinput access (all desktops):
+
+sudo tee /etc/udev/rules.d/99-linboard-uinput.rules <<'EOF'
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG input $USER
+
+Then log out and log back in, and restart LinBoard.
+
+X11-only fallback: sudo apt install xdotool  (or dnf/pacman equivalent)`
+}
+
+// PasteToolName reports the primary paste backend for diagnostics.
 func PasteToolName() string {
-	for _, t := range pasteTools() {
-		if _, err := exec.LookPath(t.bin); err == nil {
-			return t.bin
-		}
+	if uinputReady() {
+		return "uinput"
+	}
+	if SessionNeedsRelogin() {
+		return "uinput (log out/in)"
+	}
+	if UinputWritable() {
+		return "uinput"
+	}
+	if useXdotoolPaste() {
+		return "xdotool"
 	}
 	return "none"
 }

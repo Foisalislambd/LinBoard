@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
 	"github.com/foisal/linboard/internal/platform"
 )
@@ -32,6 +33,7 @@ func (r VerifyReport) Healthy() bool {
 // Verify checks shortcut prerequisites after SetupAt.
 func Verify(exe string) VerifyReport {
 	r := VerifyReport{Binary: exe}
+	defer appendPasteVerify(&r)
 
 	if !platform.IsGNOME() {
 		r.OK = append(r.OK, "desktop: "+platform.DesktopName())
@@ -97,11 +99,22 @@ func Verify(exe string) VerifyReport {
 		}
 	}
 
-	if !hasBin("wtype") && !hasBin("xdotool") {
-		r.Warn = append(r.Warn, "no wtype/xdotool — auto-paste disabled (copy still works)")
-	}
-
 	return r
+}
+
+func appendPasteVerify(r *VerifyReport) {
+	if clipboard.PasteReady() {
+		r.OK = append(r.OK, "auto-paste ready ("+clipboard.PasteToolName()+")")
+		return
+	}
+	if clipboard.SessionNeedsRelogin() {
+		r.Warn = append(r.Warn, "auto-paste: log out/in to activate input group (or: linboard-start)")
+		return
+	}
+	r.Warn = append(r.Warn, "auto-paste not ready — run: linboard setup-paste")
+	if !platform.UsePortalHotkey() && !hasBin("xdotool") {
+		r.Warn = append(r.Warn, "X11 fallback: install xdotool if uinput setup is unavailable")
+	}
 }
 
 // PrintVerify writes a human-readable report to stdout.

@@ -27,6 +27,10 @@ fi
 
 install -m 755 "$ROOT/linboard" "$BIN_DIR/linboard"
 
+if declare -F linboard_install_launcher >/dev/null 2>&1; then
+  linboard_install_launcher "$BIN_DIR"
+fi
+
 if [[ -d "$ROOT/icons" ]]; then
   if declare -F linboard_install_theme_icons >/dev/null 2>&1; then
     linboard_install_theme_icons "$ROOT/icons"
@@ -36,7 +40,9 @@ if [[ -d "$ROOT/icons" ]]; then
   fi
 fi
 
-sed "s|@EXEC@|$BIN_DIR/linboard|g" "$ROOT/linboard.desktop" > "$DESKTOP_DIR/linboard.desktop"
+LAUNCHER="$BIN_DIR/linboard-start"
+[[ -x "$LAUNCHER" ]] || LAUNCHER="$BIN_DIR/linboard"
+sed "s|@EXEC@|$LAUNCHER|g" "$ROOT/linboard.desktop" > "$DESKTOP_DIR/linboard.desktop"
 chmod 644 "$DESKTOP_DIR/linboard.desktop"
 
 cat > "$AUTOSTART_DIR/linboard.desktop" <<EOF
@@ -44,7 +50,7 @@ cat > "$AUTOSTART_DIR/linboard.desktop" <<EOF
 Type=Application
 Name=LinBoard
 Comment=Clipboard Manager
-Exec=$BIN_DIR/linboard
+Exec=$BIN_DIR/linboard-start
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true

@@ -106,6 +106,9 @@ func (a *App) Run() {
 	log.Printf("LinBoard %s — %s / %s (clipboard read: %s, copy: %s, paste: %s)",
 		config.AppVersion, platform.SessionDescription(), platform.DesktopName(),
 		clipboard.ReadToolName(), clipboard.CopyToolName(), clipboard.PasteToolName())
+	if clipboard.SessionNeedsRelogin() {
+		log.Printf("auto-paste: input group not active in this session — log out/in, or: sg input -c linboard")
+	}
 
 	// Start IPC first so Super+V works while the rest of the app initializes.
 	ipcSrv, err := ipc.StartServer(a.showHistory)

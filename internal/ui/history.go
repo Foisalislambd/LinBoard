@@ -17,8 +17,34 @@ import (
 	"github.com/foisal/linboard/internal/assets"
 	"github.com/foisal/linboard/internal/clipboard"
 	"github.com/foisal/linboard/internal/config"
+	"github.com/foisal/linboard/internal/platform"
 	"github.com/foisal/linboard/internal/store"
 )
+
+// pasteRow wraps a list row and pastes its clip on mouse click (CopyQ-style).
+type pasteRow struct {
+	widget.BaseWidget
+	row     fyne.CanvasObject
+	onPaste func()
+}
+
+func newPasteRow(row fyne.CanvasObject) *pasteRow {
+	p := &pasteRow{row: row}
+	p.ExtendBaseWidget(p)
+	return p
+}
+
+func (p *pasteRow) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(p.row)
+}
+
+func (p *pasteRow) Tapped(*fyne.PointEvent) {
+	if p.onPaste != nil {
+		p.onPaste()
+	}
+}
+
+func (p *pasteRow) TappedSecondary(*fyne.PointEvent) {}
 
 type HistoryWindow struct {
 	app      fyne.App
@@ -77,12 +103,13 @@ func (h *HistoryWindow) build() {
 			timeLabel.TextStyle = fyne.TextStyle{Italic: true}
 			typeBadge := widget.NewLabel("")
 			typeBadge.TextStyle = fyne.TextStyle{Bold: true}
-			return container.NewBorder(
+			border := container.NewBorder(
 				nil, nil,
 				container.NewHBox(pinIcon, typeBadge),
 				container.NewHBox(copyBtn, timeLabel),
 				preview,
 			)
+			return newPasteRow(border)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			h.mu.Lock()
@@ -92,8 +119,16 @@ func (h *HistoryWindow) build() {
 			}
 			clip := h.clips[id]
 			h.mu.Unlock()
+
+			row := obj.(*pasteRow)
+			itemID := int(id)
+			row.onPaste = func() {
+				h.list.Select(widget.ListItemID(itemID))
+				h.pasteClipAt(itemID)
+			}
+
 			// NewBorder order: center, left, right (see fyne container.NewBorder)
-			border := obj.(*fyne.Container)
+			border := row.row.(*fyne.Container)
 			preview := border.Objects[0].(*widget.Label)
 			left := border.Objects[1].(*fyne.Container)
 			right := border.Objects[2].(*fyne.Container)
@@ -136,7 +171,7 @@ func (h *HistoryWindow) build() {
 	}
 	h.list.OnUnselected = func(_ widget.ListItemID) {}
 
-	help := widget.NewLabel("↑↓ Navigate  •  Enter Paste  •  Del Remove  •  P Pin  •  Esc Close")
+	help := widget.NewLabel("Click Paste  •  ↑↓ Navigate  •  Enter Paste  •  Del Remove  •  P Pin  •  Esc Close")
 	help.TextStyle = fyne.TextStyle{Italic: true}
 	help.Alignment = fyne.TextAlignCenter
 
@@ -228,19 +263,33 @@ func (h *HistoryWindow) refreshList() {
 
 func (h *HistoryWindow) pasteSelected() {
 	h.mu.Lock()
-	if h.selected < 0 || h.selected >= len(h.clips) {
+	sel := h.selected
+	h.mu.Unlock()
+	h.pasteClipAt(sel)
+}
+
+func (h *HistoryWindow) pasteClipAt(id int) {
+	h.mu.Lock()
+	if id < 0 || id >= len(h.clips) {
 		h.mu.Unlock()
 		return
 	}
-	clip := h.clips[h.selected]
+	clip := h.clips[id]
 	h.mu.Unlock()
 
-	h.Hide()
-	if h.cfg.PasteOnSelect {
-		_ = clipboard.PasteClip(&clip)
-	} else {
-		_ = clipboard.CopyClip(&clip)
+	if err := clipboard.CopyClip(&clip); err != nil {
+		log.Printf("copy failed: %v", err)
+		return
 	}
+	h.Hide()
+	if !h.cfg.PasteOnSelect {
+		return
+	}
+	go func() {
+		if err := clipboard.PasteToTarget(); err != nil {
+			log.Printf("paste failed: %v", err)
+		}
+	}()
 }
 
 func (h *HistoryWindow) deleteSelected() {
@@ -279,6 +328,7 @@ func (h *HistoryWindow) Toggle() {
 	if visible {
 		h.Hide()
 	} else {
+		platform.CapturePasteTarget()
 		h.Show()
 	}
 }

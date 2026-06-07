@@ -22,7 +22,7 @@ sudo apt-get install -y \
   libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev \
   libgl1-mesa-dev libxxf86vm-dev \
   libayatana-appindicator3-dev libdbus-1-dev \
-  xdotool wtype
+  xdotool
 
 echo "==> Checking Go installation..."
 CURRENT=$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "none")

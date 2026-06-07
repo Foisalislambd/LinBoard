@@ -156,15 +156,6 @@ func CopyClip(clip *store.Clip) error {
 	}
 }
 
-// PasteClip copies content to clipboard and simulates Ctrl+V in the previously focused window.
-func PasteClip(clip *store.Clip) error {
-	if err := CopyClip(clip); err != nil {
-		return err
-	}
-	time.Sleep(120 * time.Millisecond)
-	return simulatePaste()
-}
-
 func noteTextSeen(text string) {
 	if activeMonitor == nil {
 		return

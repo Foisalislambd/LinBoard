@@ -8,7 +8,14 @@ Thank you for helping make LinBoard work great on every Linux desktop!
 git clone https://github.com/Foisalislambd/LinBoard.git
 cd LinBoard
 ./scripts/setup.sh   # Debian/Ubuntu deps + build
-make run
+make run             # uses sg input when paste group is stale
+```
+
+Auto-paste uses built-in **uinput** (`internal/clipboard/uinput_linux.go`). Check with:
+
+```bash
+linboard setup-paste
+sg input -c ./linboard   # if group not active in current session
 ```
 
 ## Code guidelines
@@ -16,6 +23,7 @@ make run
 - Go 1.26+
 - Match existing package layout under `internal/`
 - Test on **GNOME Wayland** and at least one of: KDE, XFCE, or X11
+- Paste flow: `platform.CapturePasteTarget` → `CopyClip` → `Hide` → `PasteToTarget`
 - Keep hotkey logic in `internal/hotkey/` — one file per desktop environment
 - Use `fyne.DoFromGoroutine` for all UI updates from background threads
 
@@ -52,7 +60,7 @@ Include:
 - Distro and version (e.g. Ubuntu 24.04)
 - Desktop (GNOME, KDE Plasma, XFCE, …)
 - Session type (`echo $XDG_SESSION_TYPE`)
-- Log output from `./linboard`
+- Log output from `./linboard` and `linboard setup-paste`
 
 ## License
 

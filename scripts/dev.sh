@@ -58,6 +58,10 @@ cmd_run() {
   fi
   cmd_stop_quiet
   echo "==> Running $BINARY (Super+V to open history)"
+  if [[ ! -w /dev/uinput ]] && getent group input 2>/dev/null | awk -F: '{print $4}' | tr ',' '\n' | grep -qx "$USER" && ! id -nG | tr ' ' '\n' | grep -qx input; then
+    echo "==> input group active — starting with sg input (log out/in to skip)"
+    exec sg input -c "exec \"$ROOT/$BINARY\""
+  fi
   exec "$ROOT/$BINARY" "$@"
 }
 

@@ -136,17 +136,99 @@ linboard_install_clipboard_tools() {
   linboard_install_packages "${need[@]}" || true
 }
 
+linboard_ensure_uinput_module() {
+  [[ -e /dev/uinput ]] && return 0
+  if linboard_have modprobe; then
+    linboard_log "Loading uinput kernel module..."
+    linboard_sudo modprobe uinput 2>/dev/null || true
+  fi
+}
+
+linboard_ensure_uinput_udev_rule() {
+  local rule_file="/etc/udev/rules.d/99-linboard-uinput.rules"
+  local rule='KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"'
+
+  if [[ -f "$rule_file" ]] && grep -qF 'GROUP="input"' "$rule_file" 2>/dev/null; then
+    return 0
+  fi
+
+  linboard_log "Installing uinput udev rule for auto-paste..."
+  if ! linboard_sudo tee "$rule_file" >/dev/null <<EOF
+# LinBoard — allow input group to use uinput for auto-paste
+$rule
+EOF
+  then
+    linboard_warn "Could not install $rule_file — run: linboard setup-paste"
+    return 1
+  fi
+
+  if command -v udevadm >/dev/null 2>&1; then
+    linboard_sudo udevadm control --reload-rules 2>/dev/null || true
+    linboard_sudo udevadm trigger --subsystem-match=misc 2>/dev/null || true
+  fi
+}
+
+linboard_ensure_input_group() {
+  [[ -e /dev/uinput ]] || return 0
+  [[ -w /dev/uinput ]] && return 0
+
+  linboard_ensure_uinput_udev_rule || true
+
+  if id -nG "$USER" 2>/dev/null | tr ' ' '\n' | grep -qx input; then
+    linboard_warn "input group set but /dev/uinput not writable — log out and back in"
+    return 0
+  fi
+
+  linboard_log "Adding $USER to input group for auto-paste..."
+  linboard_sudo usermod -aG input "$USER" || true
+  linboard_warn "Log out and log back in for auto-paste to work"
+}
+
 linboard_install_paste_tools() {
   linboard_detect_session
-  local need=()
+  linboard_ensure_uinput_module
+  linboard_ensure_uinput_udev_rule || true
+  linboard_ensure_input_group
 
-  if ! linboard_have wtype; then need+=("wtype"); fi
-  if ! linboard_have xdotool; then need+=("xdotool"); fi
+  # X11 sessions: xdotool helps focus + paste for legacy apps.
+  if [[ "$LINBOARD_SESSION" == "x11" ]] && ! linboard_have xdotool; then
+    linboard_log "Installing xdotool (X11 auto-paste fallback)..."
+    linboard_install_packages xdotool || true
+  fi
+}
 
-  [[ ${#need[@]} -eq 0 ]] && return 0
+linboard_install_launcher() {
+  local bin_dir="${1:-$HOME/.local/bin}"
+  local launcher="$bin_dir/linboard-start"
+  local exe="$bin_dir/linboard"
+  [[ -x "$exe" ]] || return 0
 
-  linboard_log "Setting up auto-paste tools (${LINBOARD_SESSION} session)..."
-  linboard_install_packages "${need[@]}" || true
+  cat > "$launcher" <<'EOF'
+#!/usr/bin/env bash
+# LinBoard launcher — uses sg input when group was added but session is stale.
+set -euo pipefail
+LB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/linboard"
+if [[ -x "$LB" ]]; then
+  :
+elif [[ -x "$HOME/.local/bin/linboard" ]]; then
+  LB="$HOME/.local/bin/linboard"
+else
+  echo "linboard: binary not found" >&2
+  exit 1
+fi
+run() {
+  exec "$LB" "$@"
+}
+if [[ -w /dev/uinput ]]; then
+  run "$@"
+fi
+if getent group input 2>/dev/null | awk -F: '{print $4}' | tr ',' '\n' | grep -qx "$USER" \
+   && ! id -nG | tr ' ' '\n' | grep -qx input; then
+  exec sg input -c "$(printf 'exec %q ' "$LB" "$@")"
+fi
+run "$@"
+EOF
+  chmod +x "$launcher"
 }
 
 linboard_ensure_gnome_media_keys() {
@@ -260,24 +342,28 @@ linboard_ensure_path() {
 linboard_start_app() {
   local bin_dir="$1"
   local exe="$bin_dir/linboard"
+  local launcher="$bin_dir/linboard-start"
 
   [[ -x "$exe" ]] || return 0
+  linboard_install_launcher "$bin_dir"
 
   pkill -x linboard 2>/dev/null || true
   sleep 0.3
 
   linboard_log "Starting LinBoard in the background..."
   if [[ -n "${DISPLAY:-}" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
-    nohup "$exe" >/dev/null 2>&1 &
+    local run="$exe"
+    [[ -x "$launcher" ]] && run="$launcher"
+    nohup "$run" >/dev/null 2>&1 &
     disown 2>/dev/null || true
     sleep 0.5
     if pgrep -x linboard >/dev/null; then
       linboard_log "LinBoard is running (system tray)"
     else
-      linboard_warn "Start manually: linboard"
+      linboard_warn "Start manually: linboard-start"
     fi
   else
-    linboard_warn "No display detected — run 'linboard' after you log in to your desktop"
+    linboard_warn "No display detected — run 'linboard-start' after you log in to your desktop"
   fi
 }
 
@@ -319,14 +405,20 @@ linboard_post_install_setup() {
     linboard_warn "No display — run 'linboard install-shortcut' after login"
   fi
 
+  linboard_install_launcher "$bin_dir"
   linboard_start_app "$bin_dir"
+
+  if [[ -e /dev/uinput ]] && ! [[ -w /dev/uinput ]]; then
+    linboard_warn "Auto-paste: log out and back in (or run: linboard setup-paste)"
+  fi
 
   echo ""
   echo "  ┌─────────────────────────────────────────────┐"
   echo "  │  LinBoard installed successfully!           │"
   echo "  │                                             │"
   echo "  │  Press Super+V (Win+V) to open history      │"
-  echo "  │  Tray icon: look at the top panel           │"
+  echo "  │  Click an item to paste (CopyQ-style)       │"
+  echo "  │  Check paste: linboard setup-paste          │"
   echo "  └─────────────────────────────────────────────┘"
   echo ""
 }
