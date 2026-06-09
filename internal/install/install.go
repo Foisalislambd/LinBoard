@@ -113,6 +113,14 @@ func copyFile(src, dst string) error {
 func writeLauncher(path, linboardExe string) error {
 	script := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
+
+# Detach when run from a terminal so the app survives after the shell closes.
+if [[ -t 1 ]] && [[ "${LINBOARD_FOREGROUND:-}" != "1" ]]; then
+  LINBOARD_FOREGROUND=1 nohup "$0" "$@" >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+  exit 0
+fi
+
 LB=%q
 run() {
   exec "$LB" "$@"

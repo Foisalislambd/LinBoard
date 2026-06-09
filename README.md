@@ -105,12 +105,13 @@ Install the [AppIndicator extension](https://extensions.gnome.org/extension/615/
 
 ## Upgrade
 
-Run the install command again — it always fetches the latest version:
+Run the install command again — it always fetches the latest version and restarts LinBoard in the background:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Foisalislambd/LinBoard/main/scripts/install-release.sh | bash
-pkill linboard; linboard-start
 ```
+
+To restart manually after an upgrade: `linboard-start` (runs in the background; survives terminal close). LinBoard also starts on login via `~/.config/autostart/` — there is no systemd service.
 
 ---
 
@@ -158,6 +159,7 @@ Edit `~/.config/linboard/config.json`:
 | Tray icon missing (GNOME) | Install [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) |
 | Paste doesn't work | Run `linboard setup-paste`, then log out/in |
 | Paste works after install but not from autostart | Use `linboard-start` (installed automatically) |
+| Stops when terminal closes after upgrade | Re-run the install command, or `linboard-start` — do not run bare `linboard` in a terminal |
 | Hotkey conflict | Remove the old binding in Settings → Keyboard |
 
 ### Auto-paste by desktop
