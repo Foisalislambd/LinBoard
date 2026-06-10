@@ -38,18 +38,14 @@ sg input -c ./linboard   # if group not active in current session
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | Pull requests | Build + vet (`-tags headless`) |
+| `ci.yml` | Pull requests | Build + vet + test |
 | `release.yml` | Push to `main` | Build packages → tag → GitHub Release |
 
 Pushing to `main` auto-bumps the patch version and publishes a release **after** a successful build (tag is created last).
 
 Skip release: include `[skip release]` in the commit message.
 
-Local headless build (no display needed for `version` / `help`):
-
-```bash
-go build -tags headless -o linboard ./cmd/linboard
-```
+CLI subcommands (`version`, `help`, `setup-paste`, `doctor`) work without a display.
 
 Each tarball contains the binary, `install.sh`, desktop file, and `QUICKSTART.txt`.
 

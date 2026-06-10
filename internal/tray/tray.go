@@ -10,15 +10,14 @@ import (
 )
 
 type Tray struct {
-	cfg       *config.Config
 	onShow    func()
 	onClear   func()
 	onQuit    func()
 	countItem *systray.MenuItem
 }
 
-func New(cfg *config.Config) *Tray {
-	return &Tray{cfg: cfg}
+func New() *Tray {
+	return &Tray{}
 }
 
 func (t *Tray) OnShow(fn func())  { t.onShow = fn }

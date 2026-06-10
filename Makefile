@@ -39,7 +39,7 @@ install:
 	@./scripts/dev.sh install
 
 install-shortcut:
-	@./linboard install-shortcut
+	@./scripts/dev.sh install-shortcut
 
 icons:
 	@python3 scripts/generate-icons.py

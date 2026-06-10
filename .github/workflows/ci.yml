@@ -27,6 +27,7 @@ jobs:
         run: |
           go mod tidy
           go vet ./...
-          go build -tags headless -ldflags "-s -w" -o linboard ./cmd/linboard
+          go test ./...
+          go build -ldflags "-s -w" -o linboard ./cmd/linboard
           ./linboard version
           ./linboard help | head -1

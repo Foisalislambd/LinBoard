@@ -83,7 +83,7 @@ func New() (*App, error) {
 	a.history = ui.NewHistoryWindow(a.fyneApp, s, cfg)
 	a.monitor = clipboard.NewMonitor(s)
 	a.hotkey = hotkey.New()
-	a.tray = tray.New(cfg)
+	a.tray = tray.New()
 
 	return a, nil
 }
@@ -140,7 +140,12 @@ func (a *App) Run() {
 		}
 	}()
 
-	go a.tray.Run(a.updateTrayCount)
+	go a.tray.Run(func() {
+		a.updateTrayCount()
+		if !a.cfg.StartMinimized {
+			a.showHistory()
+		}
+	})
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

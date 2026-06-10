@@ -79,6 +79,8 @@ func desktopBackend() backend {
 		return &xfceBackend{}
 	case platform.DesktopCinnamon:
 		return &cinnamonBackend{}
+	case platform.DesktopMATE:
+		return &mateBackend{}
 	default:
 		return nil
 	}

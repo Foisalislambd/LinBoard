@@ -3,7 +3,6 @@ package install
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/foisal/linboard/internal/assets"
@@ -140,7 +139,3 @@ run "$@"
 	return nil
 }
 
-func HasLocalBin() bool {
-	_, err := exec.LookPath("linboard")
-	return err != nil
-}

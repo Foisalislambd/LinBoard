@@ -106,6 +106,6 @@ Usage:
 
 Hotkey: Super+V (Win+V) — like Windows clipboard history.
 
-Supported: GNOME, KDE Plasma, XFCE, Cinnamon, X11 and Wayland.
+Supported: GNOME, KDE Plasma, XFCE, Cinnamon, MATE — X11 and Wayland.
 `, config.AppVersion)
 }

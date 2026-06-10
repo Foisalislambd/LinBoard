@@ -54,6 +54,7 @@ func registerSystemShortcut(exe string) error {
 		{"KDE", setupKDEHotkey},
 		{"XFCE", setupXFCEHotkey},
 		{"Cinnamon", setupCinnamonHotkey},
+		{"MATE", setupMATEHotkey},
 	}
 	var errs []string
 	for _, b := range backends {

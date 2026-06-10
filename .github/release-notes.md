@@ -16,7 +16,7 @@ Press **Super+V** to open your clipboard history. Click an item to paste it into
 - **CopyQ-style auto-paste** — built-in uinput, no extra tools required
 - Search, pin, keyboard navigation
 - System tray integration
-- Local SQLite storage — your data stays on your machine
+- Local JSON storage — your data stays on your machine
 
 ### Install
 

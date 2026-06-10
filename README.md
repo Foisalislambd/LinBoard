@@ -54,7 +54,7 @@ LinBoard starts automatically on login after install.
 - **CopyQ-style auto-paste** — built-in uinput (no ydotool/wtype needed)
 - Search, pin, and keyboard navigation
 - Runs quietly in the system tray
-- History saved locally (SQLite, your machine only)
+- History saved locally (JSON, your machine only)
 
 ---
 
@@ -137,6 +137,7 @@ Edit `~/.config/linboard/config.json`:
 ```json
 {
   "max_history": 200,
+  "start_minimized": true,
   "paste_on_select": true,
   "theme": "system"
 }
@@ -145,7 +146,7 @@ Edit `~/.config/linboard/config.json`:
 | File | What's stored |
 |------|-----------------|
 | `~/.config/linboard/config.json` | Your settings |
-| `~/.config/linboard/data/history.db` | Clipboard history |
+| `~/.config/linboard/data/clips.json` | Clipboard history |
 | `~/.config/linboard/data/images/` | Copied images |
 
 ---

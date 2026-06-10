@@ -15,6 +15,9 @@ func SetupAt(exe string) error {
 	if platform.IsGNOME() {
 		return setupGNOME(exe)
 	}
+	if platform.IsMATE() {
+		return setupMATEHotkey(exe)
+	}
 	return registerSystemShortcut(exe)
 }
 
@@ -35,6 +38,9 @@ func Verify(exe string) VerifyReport {
 	r := VerifyReport{Binary: exe}
 	defer appendPasteVerify(&r)
 
+	if platform.IsMATE() {
+		return verifyMATEShortcut(r, exe)
+	}
 	if !platform.IsGNOME() {
 		r.OK = append(r.OK, "desktop: "+platform.DesktopName())
 		return r
