@@ -39,10 +39,24 @@ func CopyToolName() string {
 
 // WriteText puts UTF-8 text on the system clipboard.
 func WriteText(text string) error {
-	for _, w := range textWriters() {
-		if err := w(text); err == nil {
-			return nil
+	writers := textWriters()
+	if len(writers) == 0 {
+		return fmt.Errorf("clipboard write failed")
+	}
+	var lastErr error
+	ok := false
+	for _, w := range writers {
+		if err := w(text); err != nil {
+			lastErr = err
+			continue
 		}
+		ok = true
+	}
+	if ok {
+		return nil
+	}
+	if lastErr != nil {
+		return fmt.Errorf("clipboard write failed: %w", lastErr)
 	}
 	return fmt.Errorf("clipboard write failed")
 }

@@ -60,10 +60,9 @@ func New() (*App, error) {
 	a.fyneApp = fyneapp.NewWithID("com.linboard.app")
 	a.fyneApp.SetIcon(assets.Fyne())
 	clipboard.SetFyneWriter(func(text string) {
-		// UI handlers (copy button) run on main — must not use DoAndWait there.
-		a.fyneApp.Driver().DoFromGoroutine(func() {
-			a.fyneApp.Clipboard().SetContent(text)
-		}, false)
+		// CopyClip runs on the Fyne main thread — set synchronously so PasteToTarget
+		// sees the new clipboard contents immediately after CopyClip returns.
+		a.fyneApp.Clipboard().SetContent(text)
 	})
 	clipboard.SetFyneReader(func() string {
 		var text string

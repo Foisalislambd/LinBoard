@@ -171,7 +171,7 @@ func (h *HistoryWindow) build() {
 	}
 	h.list.OnUnselected = func(_ widget.ListItemID) {}
 
-	help := widget.NewLabel("Click Paste  •  ↑↓ Navigate  •  Enter Paste  •  Del Remove  •  P Pin  •  Esc Close")
+	help := widget.NewLabel("Click row to paste  •  ↑↓ Navigate  •  Enter Paste  •  Del Remove  •  P Pin  •  Esc Close")
 	help.TextStyle = fyne.TextStyle{Italic: true}
 	help.Alignment = fyne.TextAlignCenter
 

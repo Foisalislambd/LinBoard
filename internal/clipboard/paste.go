@@ -60,7 +60,7 @@ func simulatePaste() error {
 }
 
 func useXdotoolPaste() bool {
-	if !hasBin("xdotool") {
+	if !haveCommand("xdotool") {
 		return false
 	}
 	if !platform.UsePortalHotkey() {
@@ -97,11 +97,6 @@ func PasteReady() bool {
 		return true
 	}
 	return useXdotoolPaste()
-}
-
-func hasBin(name string) bool {
-	_, err := exec.LookPath(name)
-	return err == nil
 }
 
 // PasteSetupHint returns one-time setup instructions when paste is unavailable.

@@ -73,8 +73,5 @@ func PasteSessionHint() string {
   sg input -c "linboard"
   # autostart uses ~/.local/bin/linboard-start after install`
 	}
-	if _, err := os.Stat("/etc/udev/rules.d/99-linboard-uinput.rules"); err != nil {
-		return PasteSetupHint()
-	}
 	return PasteSetupHint()
 }
